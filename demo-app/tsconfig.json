@@ -10,7 +10,8 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "types": ["node"],
-    "noEmit": true
+    "noEmit": true,
+    "allowImportingTsExtensions": true
   },
-  "include": ["*.ts"]
+  "include": ["*.ts", "src/**/*.ts"]
 }

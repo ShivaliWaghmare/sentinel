@@ -25,16 +25,26 @@ All notable changes to this project are documented here. Format: Keep a Changelo
   - Table-driven store tests on a temporary database; httptest handler tests for success, validation errors, 404s, slug collisions, read-only mode, CORS and panics.
 - ARCHITECTURE.md: an "API conventions" section (wrapped lists, snake_case, RFC 3339, error format and status codes) and the health response shape.
 - ADR-0006: app slugs are stable and never reused.
+- ShopLite demo app (`demo-app/`):
+  - Express pages: login, products (search, sort by name and price), product detail, cart (quantity, remove), checkout (name, address, zip, card validation, 8% tax), order confirmation, and logout. In-memory sessions (`sid` cookie), carts and orders. Users `demo`/`demo123` and `locked`/`demo123`. Labels, headings and `data-testid`s for locators.
+  - `BUGS` plants cart_badge, sort_price, checkout_total, search_case, login_error and form_validation. `UI_VERSION=2` renames buttons, changes test ids and moves search into the header. `FLAKY=1` delays `GET /api/products` by 4–8 s on about 30% of requests. Invalid values stop startup. `GET /__health` reports the mode.
+  - README describing the modes, the bugs and the v1 → v2 differences.
+- `agents/tests/_support/fixtures.ts`: an auto fixture that attaches `url.txt` and `aria-snapshot.txt` when a test fails, and re-exports `expect` and the `Page` type.
+- `agents/tests/shoplite/manual/`: 8-test hand-written baseline suite (auth, cart, search, checkout). It passes in the default mode, catches only `cart_badge` among the planted bugs, and 7 of 8 tests fail with locator errors under `UI_VERSION=2`.
 
 ### Changed
 - Node 22 is the baseline: `engines.node >=22` in agents/, demo-app/ and web/; `@types/node` bumped to 22 everywhere.
 - agents/: vitest 3.x → 5.x.
+- agents/ and demo-app/ tsconfig: `allowImportingTsExtensions`, so imports use `.ts` paths (tsx and Playwright run them directly). demo-app/ also typechecks `src/`.
+- ARCHITECTURE.md: FLAKY now means 4–8 s delays on the products API (no failures), plus details on ShopLite state, startup validation and `/__health`.
 
 ### Known gaps
 - `npm audit` reports 5 high-severity advisories in web/ dev dependencies from create-next-app; not reviewed yet.
 - Unknown routes and wrong methods get Go's default plain-text 404/405, not the JSON error format.
 - App and test lists have no pagination.
 - `GET /api/tests/{id}/source` is not implemented yet.
-- `agents/tests/_support/fixtures.ts` does not exist yet.
+- ShopLite state is in memory and resets on restart; sessions never expire.
+- `demo-app/public/app.js` is plain JavaScript and isn't typechecked or linted.
+- Under `FLAKY=1` mainly the search test turns flaky, because actions wait up to 30 s for the product list while only `expect` uses the 5 s timeout.
 - No formatter or linter for agents/ and demo-app/ beyond `tsc` (no Prettier/ESLint there).
 - `make dev` interleaves the three processes' output without prefixes, and `tsx watch` prints a few "Force killing" lines on Ctrl+C (harmless).

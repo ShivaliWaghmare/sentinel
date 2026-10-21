@@ -13,7 +13,8 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "types": ["node"],
-    "noEmit": true
+    "noEmit": true,
+    "allowImportingTsExtensions": true
   },
   "include": ["src", "tests", "playwright.config.ts", "vitest.config.ts"]
 }

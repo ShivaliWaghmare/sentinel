@@ -131,9 +131,12 @@ Every endpoint follows these rules:
 
 ## Demo app (demo-app/)
 "ShopLite": an Express server with server-rendered pages: login, products (search, sort), product detail, cart, checkout form with validation, order confirmation.
-- BUGS (comma list) plants bugs: cart_badge, sort_price, checkout_total, search_case, login_error, form_validation.
-- UI_VERSION=2 keeps behavior but changes the UI (button labels, test ids, layout); used to evaluate healing.
-- FLAKY=1 makes one endpoint randomly slow or failing; used to evaluate flaky triage.
+- State (sessions, carts, orders) is in memory. Users: demo/demo123 and locked/demo123 (shows "account locked"). The product list is rendered by a little vanilla JS from `GET /api/products`; everything else is plain HTML forms.
+- BUGS (comma list) plants bugs: cart_badge, sort_price, checkout_total, search_case, login_error, form_validation. Each changes one behavior (see demo-app/README.md).
+- UI_VERSION=2 keeps behavior but changes the UI (button labels, test ids, search moved into the header); used to evaluate healing.
+- FLAKY=1 makes `GET /api/products` wait 4–8 s on about 30% of requests, so the product list sometimes outlasts Playwright's 5 s expect timeout; used to evaluate flaky triage.
+- Invalid BUGS, UI_VERSION or FLAKY values stop the server at startup. `GET /__health` returns `{"ok": true, "bugs": [...], "ui_version": 1, "flaky": false}` so evals can confirm the mode.
+- The hand-written baseline suite is agents/tests/shoplite/manual/ (8 tests).
 
 ## Evals (evals/)
 Experiments: coverage and validity, bug detection (manual vs generated suites), self-healing (including unsafe-heal rate), triage accuracy. Results go to evals/results/<timestamp>.json and latest.json, with a summary table in evals/RESULTS.md.

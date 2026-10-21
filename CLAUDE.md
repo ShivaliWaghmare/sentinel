@@ -44,6 +44,7 @@ sentinel/
 | Go server only | `make server` |
 | Dashboard only | `make web` |
 | Demo app only | `make demo` |
+| Demo app in a mode (see demo-app/README.md) | `BUGS=cart_badge,sort_price UI_VERSION=2 FLAKY=1 make demo` |
 | All tests (Go, agents) | `make test` |
 | Lint and typecheck (gofmt check, go vet, tsc, ESLint) | `make lint` |
 | Evals | `make eval` |
