@@ -44,8 +44,9 @@ Notifications go to a Slack Incoming Webhook and SMTP email.
 
 ## Data model (SQLite)
 Timestamps are stored as INTEGER unix milliseconds; the API returns RFC 3339 strings.
+IDs are INTEGER PRIMARY KEY AUTOINCREMENT, so a deleted row's ID is never reused (IDs appear in URLs and name folders such as data/runs/<id>/). Migrations are numbered files in server/internal/store/migrations/, applied at startup and tracked in schema_migrations.
 
-- apps: id, name, slug (unique), base_url, notes (guidance for agents, e.g. demo login), allow_destructive (bool), created_at
+- apps: id, name, slug (unique, never changes; ADR-0006), base_url, notes (guidance for agents, e.g. demo login), allow_destructive (bool), created_at
 - schedules: id, app_id → apps, cron, enabled, created_at
 - test_cases: id, app_id, file_path, title, origin (manual|generated), status (active|quarantined|retired), agent_run_id (nullable), created_at. Unique (app_id, file_path, title).
 - runs: id, app_id, trigger (manual|schedule|eval|heal), status (queued|running|passed|failed|error), total, passed, failed, flaky, skipped, duration_ms, error, started_at, finished_at
@@ -107,9 +108,19 @@ Input: failed test results. Eligible only for locator failures (locator timeout,
 Steps: read the test source and failure snapshot, open the failing URL for a fresh snapshot, propose the minimal change to locator expressions only. Patch guard: reject if expected values, test titles or the number of expect calls change. Apply to a temporary copy and run it twice against the current app. Save a proposal with the verified flag. The healer never writes the real test file.
 
 ## API
-- GET /api/health
-- GET, POST /api/apps · GET, PATCH, DELETE /api/apps/{id}
-- GET /api/apps/{id}/tests · PATCH /api/tests/{id} {status} · GET /api/tests/{id}/source
+### Conventions
+Every endpoint follows these rules:
+- JSON field names are snake_case. Timestamps are RFC 3339 strings in UTC with milliseconds (e.g. 2026-10-21T11:12:22.727Z).
+- Lists are wrapped in an object named after the resource: {"apps": [...]}, {"tests": [...]}. An empty list is [], never null.
+- Errors are {"error": "message"} with the matching status: 400 invalid input, 403 read-only mode, 404 unknown resource or non-numeric ID, 409 conflict, 413 body over 1 MB, 500 internal (details only in the server log), 503 database unavailable.
+- Request bodies are a single JSON object; unknown fields are rejected with 400.
+- PATCH is partial: absent fields stay unchanged, and an empty patch is a 400.
+- With DEMO_READ_ONLY=true every method except GET, HEAD and OPTIONS returns 403.
+
+### Endpoints
+- GET /api/health → {ok, db, read_only, llm: {provider, model, api_key_configured}, notifications: {slack, email}}. Never includes keys. Email counts as configured when SMTP_HOST, SMTP_USER, SMTP_PASS and EMAIL_TO are all set. 503 if the database is unavailable.
+- GET, POST /api/apps · GET, PATCH, DELETE /api/apps/{id}. POST {name, base_url, notes?, allow_destructive?} generates the slug and creates agents/tests/<slug>/{manual,generated}. PATCH can change those four fields, not the slug. DELETE removes the app's rows (cascade) and leaves its test files on disk.
+- GET /api/apps/{id}/tests?origin&status · PATCH /api/tests/{id} {status} · GET /api/tests/{id}/source
 - POST /api/apps/{id}/runs · GET /api/runs?app_id&limit · GET /api/runs/{id} (results with triage)
 - GET, POST /api/schedules?app_id · PATCH, DELETE /api/schedules/{id} · GET /api/schedules/preview?cron= (next 5 fire times)
 - POST /api/apps/{id}/probe · POST /api/apps/{id}/explore · POST /api/apps/{id}/heal {test_result_ids}

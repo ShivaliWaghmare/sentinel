@@ -9,11 +9,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
 
+	"github.com/ShivaliWaghmare/sentinel/server/internal/api"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/config"
+	"github.com/ShivaliWaghmare/sentinel/server/internal/store"
 )
 
 func main() {
@@ -38,20 +41,21 @@ func run() error {
 	}
 	slog.Info("config loaded", "config", cfg)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"ok": true}` + "\n"))
-	})
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	st, err := store.Open(ctx, cfg.DataDir)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	slog.Info("database ready", "path", filepath.Join(cfg.DataDir, store.DBFile))
 
 	srv := &http.Server{
 		Addr:              ":" + strconv.Itoa(cfg.Port),
-		Handler:           mux,
+		Handler:           api.New(cfg, st, slog.Default()),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 
 	errCh := make(chan error, 1)
 	go func() {
