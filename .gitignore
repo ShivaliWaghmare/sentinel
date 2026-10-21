@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Environment (keep the examples)
+.env
+.env.*
+!.env.example
+
+# Runtime data: SQLite DB, run and agent artifacts
+data/
+
+# Next.js
+.next/
+out/
+*.tsbuildinfo
+
+# Playwright outputs
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Go binaries
+server/sentinel
+server/bin/
+*.exe
+*.test
+*.out
+
+# OS and editors
+.DS_Store
+.idea/
+.vscode/
