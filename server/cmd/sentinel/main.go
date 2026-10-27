@@ -16,6 +16,8 @@ import (
 
 	"github.com/ShivaliWaghmare/sentinel/server/internal/api"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/config"
+	"github.com/ShivaliWaghmare/sentinel/server/internal/runner"
+	"github.com/ShivaliWaghmare/sentinel/server/internal/runs"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/store"
 )
 
@@ -51,9 +53,19 @@ func run() error {
 	defer st.Close()
 	slog.Info("database ready", "path", filepath.Join(cfg.DataDir, store.DBFile))
 
+	// Runs use ctx, so a shutdown signal kills in-flight Playwright processes.
+	pw := runner.New(cfg.AgentsDir, cfg.DataDir, cfg.RunTimeout)
+	runSvc := runs.New(ctx, st, pw, runs.NopNotifier{}, cfg.DataDir, slog.Default())
+	if err := runSvc.Recover(ctx); err != nil {
+		return err
+	}
+	// Registered after st.Close above, so it runs first: runs finish
+	// writing before the database closes.
+	defer runSvc.Wait()
+
 	srv := &http.Server{
 		Addr:              ":" + strconv.Itoa(cfg.Port),
-		Handler:           api.New(cfg, st, slog.Default()),
+		Handler:           api.New(cfg, st, runSvc, slog.Default()),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

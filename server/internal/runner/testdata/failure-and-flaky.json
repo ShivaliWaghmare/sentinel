@@ -1,0 +1,415 @@
+{
+  "config": {
+    "argv": [
+      "/usr/bin/node",
+      "/AGENTS/node_modules/.bin/playwright",
+      "test",
+      "tests/shoplite/manual/cart.spec.ts",
+      "tests/fixturegen",
+      "--reporter=json"
+    ],
+    "configFile": "/AGENTS/playwright.config.ts",
+    "rootDir": "/AGENTS/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/DATA/runs/1/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/AGENTS/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "filteredProjects": [
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/DATA/runs/1/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "name": "chromium",
+        "testDir": "/AGENTS/tests",
+        "snapshotDir": "/AGENTS/tests",
+        "testIgnore": [],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 30000,
+        "use": {
+          "baseURL": "http://localhost:4100",
+          "screenshot": "only-on-failure",
+          "trace": "retain-on-failure",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36",
+          "viewport": {
+            "width": 1280,
+            "height": 720
+          },
+          "screen": {
+            "width": 1920,
+            "height": 1080
+          },
+          "deviceScaleFactor": 1,
+          "isMobile": false,
+          "hasTouch": false,
+          "defaultBrowserType": "chromium"
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": "chromium"
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "default",
+    "updateSourceMethod": "patch",
+    "version": "1.64.1",
+    "workers": 4,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "fixturegen/generated/flaky.spec.ts",
+      "file": "fixturegen/generated/flaky.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Fixture",
+          "file": "fixturegen/generated/flaky.spec.ts",
+          "line": 3,
+          "column": 6,
+          "specs": [
+            {
+              "title": "fails on first attempt only",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 158,
+                      "error": {
+                        "message": "Error: first attempt fails on purpose\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: > \u001b[32m0\u001b[39m\nReceived:   \u001b[31m0\u001b[39m",
+                        "stack": "Error: first attempt fails on purpose\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: > \u001b[32m0\u001b[39m\nReceived:   \u001b[31m0\u001b[39m\n    at /AGENTS/tests/fixturegen/generated/flaky.spec.ts:6:62",
+                        "location": {
+                          "file": "/AGENTS/tests/fixturegen/generated/flaky.spec.ts",
+                          "column": 62,
+                          "line": 6
+                        },
+                        "snippet": "  4 |   test(\"fails on first attempt only\", async ({ page }, testInfo) => {\n  5 |     await page.goto(\"/login\");\n> 6 |     expect(testInfo.retry, \"first attempt fails on purpose\").toBeGreaterThan(0);\n    |                                                              ^\n  7 |   });\n  8 | });\n  9 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/AGENTS/tests/fixturegen/generated/flaky.spec.ts",
+                            "column": 62,
+                            "line": 6
+                          },
+                          "message": "Error: first attempt fails on purpose\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: > \u001b[32m0\u001b[39m\nReceived:   \u001b[31m0\u001b[39m\n\n  4 |   test(\"fails on first attempt only\", async ({ page }, testInfo) => {\n  5 |     await page.goto(\"/login\");\n> 6 |     expect(testInfo.retry, \"first attempt fails on purpose\").toBeGreaterThan(0);\n    |                                                              ^\n  7 |   });\n  8 | });\n  9 |\n    at /AGENTS/tests/fixturegen/generated/flaky.spec.ts:6:62"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-27T08:22:51.068Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/DATA/runs/1/artifacts/fixturegen-generated-flaky-99fc6-fails-on-first-attempt-only-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "url.txt",
+                          "contentType": "text/plain",
+                          "body": "aHR0cDovL2xvY2FsaG9zdDo0MTAwL2xvZ2lu"
+                        },
+                        {
+                          "name": "aria-snapshot.txt",
+                          "contentType": "text/plain",
+                          "body": "LSBiYW5uZXI6CiAgLSBsaW5rICJTaG9wTGl0ZSI6CiAgICAtIC91cmw6IC9sb2dpbgotIG1haW46CiAgLSBoZWFkaW5nICJXZWxjb21lIGJhY2siIFtsZXZlbD0xXQogIC0gcGFyYWdyYXBoOiAiRGVtbyBhY2NvdW50OiBkZW1vIC8gZGVtbzEyMyIKICAtIHRleHQ6IFVzZXJuYW1lCiAgLSB0ZXh0Ym94ICJVc2VybmFtZSIKICAtIHRleHQ6IFBhc3N3b3JkCiAgLSB0ZXh0Ym94ICJQYXNzd29yZCIKICAtIGJ1dHRvbiAiTG9nIGluIgotIHN0YXR1cw=="
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/DATA/runs/1/artifacts/fixturegen-generated-flaky-99fc6-fails-on-first-attempt-only-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/DATA/runs/1/artifacts/fixturegen-generated-flaky-99fc6-fails-on-first-attempt-only-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/AGENTS/tests/fixturegen/generated/flaky.spec.ts",
+                        "column": 62,
+                        "line": 6
+                      }
+                    },
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 101,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-10-27T08:22:51.629Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "flaky"
+                }
+              ],
+              "id": "7fd5c10207ebbea7bd5b-68632734a9ba53a657d3",
+              "file": "fixturegen/generated/flaky.spec.ts",
+              "line": 4,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "shoplite/manual/cart.spec.ts",
+      "file": "shoplite/manual/cart.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "adding products updates the cart badge",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "failed",
+                  "duration": 5424,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  getByTestId('cart-badge')\nExpected: \u001b[32m\"2\"\u001b[39m\nReceived: \u001b[31m\"1\"\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" getByTestId('cart-badge') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('cart-badge')\u001b[22m\n\u001b[2m    14 × locator resolved to <span class=\"badge\" data-cart-badge=\"\" data-testid=\"cart-badge\">1</span>\u001b[22m\n\u001b[2m       - unexpected value \"1\"\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  getByTestId('cart-badge')\nExpected: \u001b[32m\"2\"\u001b[39m\nReceived: \u001b[31m\"1\"\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" getByTestId('cart-badge') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('cart-badge')\u001b[22m\n\u001b[2m    14 × locator resolved to <span class=\"badge\" data-cart-badge=\"\" data-testid=\"cart-badge\">1</span>\u001b[22m\n\u001b[2m       - unexpected value \"1\"\u001b[22m\n\n    at /AGENTS/tests/shoplite/manual/cart.spec.ts:14:23",
+                    "location": {
+                      "file": "/AGENTS/tests/shoplite/manual/cart.spec.ts",
+                      "column": 23,
+                      "line": 14
+                    },
+                    "snippet": "  12 |\n  13 |   await addProductToCart(page, \"Desk Lamp\");\n> 14 |   await expect(badge).toHaveText(\"2\");\n     |                       ^\n  15 | });\n  16 |\n  17 | test(\"removing a product empties the cart\", async ({ page }) => {"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/AGENTS/tests/shoplite/manual/cart.spec.ts",
+                        "column": 23,
+                        "line": 14
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  getByTestId('cart-badge')\nExpected: \u001b[32m\"2\"\u001b[39m\nReceived: \u001b[31m\"1\"\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" getByTestId('cart-badge') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('cart-badge')\u001b[22m\n\u001b[2m    14 × locator resolved to <span class=\"badge\" data-cart-badge=\"\" data-testid=\"cart-badge\">1</span>\u001b[22m\n\u001b[2m       - unexpected value \"1\"\u001b[22m\n\n\n  12 |\n  13 |   await addProductToCart(page, \"Desk Lamp\");\n> 14 |   await expect(badge).toHaveText(\"2\");\n     |                       ^\n  15 | });\n  16 |\n  17 | test(\"removing a product empties the cart\", async ({ page }) => {\n    at /AGENTS/tests/shoplite/manual/cart.spec.ts:14:23"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-27T08:22:51.069Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/DATA/runs/1/artifacts/shoplite-manual-cart-adding-products-updates-the-cart-badge-chromium/test-failed-1.png"
+                    },
+                    {
+                      "name": "url.txt",
+                      "contentType": "text/plain",
+                      "body": "aHR0cDovL2xvY2FsaG9zdDo0MTAwL3Byb2R1Y3Rz"
+                    },
+                    {
+                      "name": "aria-snapshot.txt",
+                      "contentType": "text/plain",
+                      "body": "LSBiYW5uZXI6CiAgLSBsaW5rICJTaG9wTGl0ZSI6CiAgICAtIC91cmw6IC9wcm9kdWN0cwogIC0gbmF2aWdhdGlvbiAiTWFpbiI6CiAgICAtIGxpbmsgIlByb2R1Y3RzIjoKICAgICAgLSAvdXJsOiAvcHJvZHVjdHMKICAgIC0gbGluayAiQ2FydCAxIjoKICAgICAgLSAvdXJsOiAvY2FydAogICAgLSB0ZXh0OiBTaWduZWQgaW4gYXMgZGVtbwogICAgLSBidXR0b24gIkxvZyBvdXQiCi0gbWFpbjoKICAtIGhlYWRpbmcgIlByb2R1Y3RzIiBbbGV2ZWw9MV0KICAtIHNlYXJjaDoKICAgIC0gdGV4dDogU2VhcmNoIHByb2R1Y3RzCiAgICAtIHNlYXJjaGJveCAiU2VhcmNoIHByb2R1Y3RzIgogICAgLSBidXR0b24gIlNlYXJjaCIKICAtIHRleHQ6IFNvcnQgYnkKICAtIGNvbWJvYm94ICJTb3J0IGJ5IjoKICAgIC0gb3B0aW9uICJOYW1lIiBbc2VsZWN0ZWRdCiAgICAtICdvcHRpb24gIlByaWNlOiBsb3cgdG8gaGlnaCInCiAgLSBwYXJhZ3JhcGgKICAtIGxpc3QgIlByb2R1Y3RzIjoKICAgIC0gbGlzdGl0ZW06CiAgICAgIC0gaGVhZGluZyAiQ2xhc3NpYyBNdWciIFtsZXZlbD0yXToKICAgICAgICAtIGxpbmsgIkNsYXNzaWMgTXVnIjoKICAgICAgICAgIC0gL3VybDogL3Byb2R1Y3RzLzEKICAgICAgLSBwYXJhZ3JhcGg6ICQxMi4wMAogICAgICAtIGJ1dHRvbiAiQWRkIHRvIGNhcnQiCiAgICAtIGxpc3RpdGVtOgogICAgICAtIGhlYWRpbmcgIkRlc2sgTGFtcCIgW2xldmVsPTJdOgogICAgICAgIC0gbGluayAiRGVzayBMYW1wIjoKICAgICAgICAgIC0gL3VybDogL3Byb2R1Y3RzLzIKICAgICAgLSBwYXJhZ3JhcGg6ICQ0OS45OQogICAgICAtIGJ1dHRvbiAiQWRkIHRvIGNhcnQiCiAgICAtIGxpc3RpdGVtOgogICAgICAtIGhlYWRpbmcgIkxhcHRvcCBTdGFuZCIgW2xldmVsPTJdOgogICAgICAgIC0gbGluayAiTGFwdG9wIFN0YW5kIjoKICAgICAgICAgIC0gL3VybDogL3Byb2R1Y3RzLzcKICAgICAgLSBwYXJhZ3JhcGg6ICQzNS4wMAogICAgICAtIGJ1dHRvbiAiQWRkIHRvIGNhcnQiCiAgICAtIGxpc3RpdGVtOgogICAgICAtIGhlYWRpbmcgIk1lY2hhbmljYWwgS2V5Ym9hcmQiIFtsZXZlbD0yXToKICAgICAgICAtIGxpbmsgIk1lY2hhbmljYWwgS2V5Ym9hcmQiOgogICAgICAgICAgLSAvdXJsOiAvcHJvZHVjdHMvNQogICAgICAtIHBhcmFncmFwaDogJDEyOS4wMAogICAgICAtIGJ1dHRvbiAiQWRkIHRvIGNhcnQiCiAgICAtIGxpc3RpdGVtOgogICAgICAtIGhlYWRpbmcgIk5vdGVib29rIiBbbGV2ZWw9Ml06CiAgICAgICAgLSBsaW5rICJOb3RlYm9vayI6CiAgICAgICAgICAtIC91cmw6IC9wcm9kdWN0cy8zCiAgICAgIC0gcGFyYWdyYXBoOiAkNC43NQogICAgICAtIGJ1dHRvbiAiQWRkIHRvIGNhcnQiCiAgICAtIGxpc3RpdGVtOgogICAgICAtIGhlYWRpbmcgIlN0aWNreSBOb3RlcyIgW2xldmVsPTJdOgogICAgICAgIC0gbGluayAiU3RpY2t5IE5vdGVzIjoKICAgICAgICAgIC0gL3VybDogL3Byb2R1Y3RzLzgKICAgICAgLSBwYXJhZ3JhcGg6ICQ3LjI1CiAgICAgIC0gYnV0dG9uICJBZGQgdG8gY2FydCIKICAgIC0gbGlzdGl0ZW06CiAgICAgIC0gaGVhZGluZyAiV2F0ZXIgQm90dGxlIiBbbGV2ZWw9Ml06CiAgICAgICAgLSBsaW5rICJXYXRlciBCb3R0bGUiOgogICAgICAgICAgLSAvdXJsOiAvcHJvZHVjdHMvNgogICAgICAtIHBhcmFncmFwaDogJDkuNTAKICAgICAgLSBidXR0b24gIkFkZCB0byBjYXJ0IgogICAgLSBsaXN0aXRlbToKICAgICAgLSBoZWFkaW5nICJXaXJlbGVzcyBNb3VzZSIgW2xldmVsPTJdOgogICAgICAgIC0gbGluayAiV2lyZWxlc3MgTW91c2UiOgogICAgICAgICAgLSAvdXJsOiAvcHJvZHVjdHMvNAogICAgICAtIHBhcmFncmFwaDogJDI0Ljk5CiAgICAgIC0gYnV0dG9uICJBZGQgdG8gY2FydCIKLSBzdGF0dXM6ICJBZGRlZCB0byBjYXJ0OiBEZXNrIExhbXAi"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/DATA/runs/1/artifacts/shoplite-manual-cart-adding-products-updates-the-cart-badge-chromium/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/DATA/runs/1/artifacts/shoplite-manual-cart-adding-products-updates-the-cart-badge-chromium/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/AGENTS/tests/shoplite/manual/cart.spec.ts",
+                    "column": 23,
+                    "line": 14
+                  }
+                },
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 5396,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  getByTestId('cart-badge')\nExpected: \u001b[32m\"2\"\u001b[39m\nReceived: \u001b[31m\"1\"\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" getByTestId('cart-badge') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('cart-badge')\u001b[22m\n\u001b[2m    14 × locator resolved to <span class=\"badge\" data-cart-badge=\"\" data-testid=\"cart-badge\">1</span>\u001b[22m\n\u001b[2m       - unexpected value \"1\"\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  getByTestId('cart-badge')\nExpected: \u001b[32m\"2\"\u001b[39m\nReceived: \u001b[31m\"1\"\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" getByTestId('cart-badge') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('cart-badge')\u001b[22m\n\u001b[2m    14 × locator resolved to <span class=\"badge\" data-cart-badge=\"\" data-testid=\"cart-badge\">1</span>\u001b[22m\n\u001b[2m       - unexpected value \"1\"\u001b[22m\n\n    at /AGENTS/tests/shoplite/manual/cart.spec.ts:14:23",
+                    "location": {
+                      "file": "/AGENTS/tests/shoplite/manual/cart.spec.ts",
+                      "column": 23,
+                      "line": 14
+                    },
+                    "snippet": "  12 |\n  13 |   await addProductToCart(page, \"Desk Lamp\");\n> 14 |   await expect(badge).toHaveText(\"2\");\n     |                       ^\n  15 | });\n  16 |\n  17 | test(\"removing a product empties the cart\", async ({ page }) => {"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/AGENTS/tests/shoplite/manual/cart.spec.ts",
+                        "column": 23,
+                        "line": 14
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  getByTestId('cart-badge')\nExpected: \u001b[32m\"2\"\u001b[39m\nReceived: \u001b[31m\"1\"\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" getByTestId('cart-badge') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('cart-badge')\u001b[22m\n\u001b[2m    14 × locator resolved to <span class=\"badge\" data-cart-badge=\"\" data-testid=\"cart-badge\">1</span>\u001b[22m\n\u001b[2m       - unexpected value \"1\"\u001b[22m\n\n\n  12 |\n  13 |   await addProductToCart(page, \"Desk Lamp\");\n> 14 |   await expect(badge).toHaveText(\"2\");\n     |                       ^\n  15 | });\n  16 |\n  17 | test(\"removing a product empties the cart\", async ({ page }) => {\n    at /AGENTS/tests/shoplite/manual/cart.spec.ts:14:23"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 1,
+                  "startTime": "2026-10-27T08:22:56.884Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/DATA/runs/1/artifacts/shoplite-manual-cart-adding-products-updates-the-cart-badge-chromium-retry1/test-failed-1.png"
+                    },
+                    {
+                      "name": "url.txt",
+                      "contentType": "text/plain",
+                      "body": "aHR0cDovL2xvY2FsaG9zdDo0MTAwL3Byb2R1Y3Rz"
+                    },
+                    {
+                      "name": "aria-snapshot.txt",
+                      "contentType": "text/plain",
+                      "body": "LSBiYW5uZXI6CiAgLSBsaW5rICJTaG9wTGl0ZSI6CiAgICAtIC91cmw6IC9wcm9kdWN0cwogIC0gbmF2aWdhdGlvbiAiTWFpbiI6CiAgICAtIGxpbmsgIlByb2R1Y3RzIjoKICAgICAgLSAvdXJsOiAvcHJvZHVjdHMKICAgIC0gbGluayAiQ2FydCAxIjoKICAgICAgLSAvdXJsOiAvY2FydAogICAgLSB0ZXh0OiBTaWduZWQgaW4gYXMgZGVtbwogICAgLSBidXR0b24gIkxvZyBvdXQiCi0gbWFpbjoKICAtIGhlYWRpbmcgIlByb2R1Y3RzIiBbbGV2ZWw9MV0KICAtIHNlYXJjaDoKICAgIC0gdGV4dDogU2VhcmNoIHByb2R1Y3RzCiAgICAtIHNlYXJjaGJveCAiU2VhcmNoIHByb2R1Y3RzIgogICAgLSBidXR0b24gIlNlYXJjaCIKICAtIHRleHQ6IFNvcnQgYnkKICAtIGNvbWJvYm94ICJTb3J0IGJ5IjoKICAgIC0gb3B0aW9uICJOYW1lIiBbc2VsZWN0ZWRdCiAgICAtICdvcHRpb24gIlByaWNlOiBsb3cgdG8gaGlnaCInCiAgLSBwYXJhZ3JhcGgKICAtIGxpc3QgIlByb2R1Y3RzIjoKICAgIC0gbGlzdGl0ZW06CiAgICAgIC0gaGVhZGluZyAiQ2xhc3NpYyBNdWciIFtsZXZlbD0yXToKICAgICAgICAtIGxpbmsgIkNsYXNzaWMgTXVnIjoKICAgICAgICAgIC0gL3VybDogL3Byb2R1Y3RzLzEKICAgICAgLSBwYXJhZ3JhcGg6ICQxMi4wMAogICAgICAtIGJ1dHRvbiAiQWRkIHRvIGNhcnQiCiAgICAtIGxpc3RpdGVtOgogICAgICAtIGhlYWRpbmcgIkRlc2sgTGFtcCIgW2xldmVsPTJdOgogICAgICAgIC0gbGluayAiRGVzayBMYW1wIjoKICAgICAgICAgIC0gL3VybDogL3Byb2R1Y3RzLzIKICAgICAgLSBwYXJhZ3JhcGg6ICQ0OS45OQogICAgICAtIGJ1dHRvbiAiQWRkIHRvIGNhcnQiCiAgICAtIGxpc3RpdGVtOgogICAgICAtIGhlYWRpbmcgIkxhcHRvcCBTdGFuZCIgW2xldmVsPTJdOgogICAgICAgIC0gbGluayAiTGFwdG9wIFN0YW5kIjoKICAgICAgICAgIC0gL3VybDogL3Byb2R1Y3RzLzcKICAgICAgLSBwYXJhZ3JhcGg6ICQzNS4wMAogICAgICAtIGJ1dHRvbiAiQWRkIHRvIGNhcnQiCiAgICAtIGxpc3RpdGVtOgogICAgICAtIGhlYWRpbmcgIk1lY2hhbmljYWwgS2V5Ym9hcmQiIFtsZXZlbD0yXToKICAgICAgICAtIGxpbmsgIk1lY2hhbmljYWwgS2V5Ym9hcmQiOgogICAgICAgICAgLSAvdXJsOiAvcHJvZHVjdHMvNQogICAgICAtIHBhcmFncmFwaDogJDEyOS4wMAogICAgICAtIGJ1dHRvbiAiQWRkIHRvIGNhcnQiCiAgICAtIGxpc3RpdGVtOgogICAgICAtIGhlYWRpbmcgIk5vdGVib29rIiBbbGV2ZWw9Ml06CiAgICAgICAgLSBsaW5rICJOb3RlYm9vayI6CiAgICAgICAgICAtIC91cmw6IC9wcm9kdWN0cy8zCiAgICAgIC0gcGFyYWdyYXBoOiAkNC43NQogICAgICAtIGJ1dHRvbiAiQWRkIHRvIGNhcnQiCiAgICAtIGxpc3RpdGVtOgogICAgICAtIGhlYWRpbmcgIlN0aWNreSBOb3RlcyIgW2xldmVsPTJdOgogICAgICAgIC0gbGluayAiU3RpY2t5IE5vdGVzIjoKICAgICAgICAgIC0gL3VybDogL3Byb2R1Y3RzLzgKICAgICAgLSBwYXJhZ3JhcGg6ICQ3LjI1CiAgICAgIC0gYnV0dG9uICJBZGQgdG8gY2FydCIKICAgIC0gbGlzdGl0ZW06CiAgICAgIC0gaGVhZGluZyAiV2F0ZXIgQm90dGxlIiBbbGV2ZWw9Ml06CiAgICAgICAgLSBsaW5rICJXYXRlciBCb3R0bGUiOgogICAgICAgICAgLSAvdXJsOiAvcHJvZHVjdHMvNgogICAgICAtIHBhcmFncmFwaDogJDkuNTAKICAgICAgLSBidXR0b24gIkFkZCB0byBjYXJ0IgogICAgLSBsaXN0aXRlbToKICAgICAgLSBoZWFkaW5nICJXaXJlbGVzcyBNb3VzZSIgW2xldmVsPTJdOgogICAgICAgIC0gbGluayAiV2lyZWxlc3MgTW91c2UiOgogICAgICAgICAgLSAvdXJsOiAvcHJvZHVjdHMvNAogICAgICAtIHBhcmFncmFwaDogJDI0Ljk5CiAgICAgIC0gYnV0dG9uICJBZGQgdG8gY2FydCIKLSBzdGF0dXM6ICJBZGRlZCB0byBjYXJ0OiBEZXNrIExhbXAi"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/DATA/runs/1/artifacts/shoplite-manual-cart-adding-products-updates-the-cart-badge-chromium-retry1/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/DATA/runs/1/artifacts/shoplite-manual-cart-adding-products-updates-the-cart-badge-chromium-retry1/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/AGENTS/tests/shoplite/manual/cart.spec.ts",
+                    "column": 23,
+                    "line": 14
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "970fb2f37a681ce3af5a-71239042e3c0f9a4d09f",
+          "file": "shoplite/manual/cart.spec.ts",
+          "line": 4,
+          "column": 1
+        },
+        {
+          "title": "removing a product empties the cart",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 380,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-27T08:23:02.644Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "970fb2f37a681ce3af5a-ce3baf8dffb8b6949451",
+          "file": "shoplite/manual/cart.spec.ts",
+          "line": 17,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-27T08:22:50.795Z",
+    "duration": 12368.417,
+    "expected": 1,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 1
+  }
+}

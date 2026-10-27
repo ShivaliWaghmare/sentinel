@@ -31,8 +31,16 @@ All notable changes to this project are documented here. Format: Keep a Changelo
   - README describing the modes, the bugs and the v1 → v2 differences.
 - `agents/tests/_support/fixtures.ts`: an auto fixture that attaches `url.txt` and `aria-snapshot.txt` when a test fails, and re-exports `expect` and the `Page` type.
 - `agents/tests/shoplite/manual/`: 8-test hand-written baseline suite (auth, cart, search, checkout). It passes in the default mode, catches only `cart_badge` among the planted bugs, and 7 of 8 tests fail with locator errors under `UI_VERSION=2`.
+- Test runs (lifecycle 1, steps 1–3 and 6):
+  - `server/internal/runner`: runs `npx playwright test tests/<slug>` (or one spec file) with `--reporter=json` in AGENTS_DIR, with BASE_URL, PLAYWRIGHT_JSON_OUTPUT_NAME and PW_OUTPUT_DIR set per run under `DATA_DIR/runs/<id>/`. Output goes to `playwright.log`. Playwright runs in its own process group, and RUN_TIMEOUT or a server stop kills the whole group. The parser covers title paths, file/line, status mapping, summed duration, retries, the first error with ANSI stripped, and screenshot/trace/url/aria-snapshot artifacts relative to DATA_DIR. The fixture's inlined (base64) url.txt and aria-snapshot.txt are written out to files. A missing report, a timeout or zero tests is an error, with the log tail.
+  - `server/internal/runs`: `StartRun` refuses a second active run per app. It executes in a goroutine, upserts test_cases (origin from `manual/` or `generated/`), stores linked test_results, then finishes the run (failed if any test failed, flaky doesn't fail it) and calls a `Notifier` hook (no-op for now). On boot, leftover running runs are marked error ("server restarted"). On shutdown, in-flight runs are stopped and recorded as error before the database closes.
+  - Store: runs (atomic create-if-no-active-run, finish, get, list, fail interrupted) and test_results (insert in one transaction, list).
+  - API: `POST /api/apps/{id}/runs` (202 / 409), `GET /api/runs?app_id&limit`, `GET /api/runs/{id}` with results, and `GET /api/artifacts/{path...}`. Artifacts are served only from `DATA_DIR/runs/`; `..`, absolute paths and symlinks escaping the folder are refused, and content types are set for png, zip and txt.
+  - Tests: parser tests against two real Playwright 1.64 reports in `runner/testdata` (all passing; failure + flaky), runner tests with a shell script in place of Playwright (env and target, missing report, no tests, process-group kill on timeout, cancel), a runs service test with a fake runner, store tests, and handler tests including path traversal and symlink escapes.
+- ARCHITECTURE.md: run status rules, run folder layout, parsing rules, run and artifact endpoint details, and the allowed artifact folders.
 
 ### Changed
+- `api.New` takes the runs service (a `RunStarter`) in addition to config, store and logger.
 - Node 22 is the baseline: `engines.node >=22` in agents/, demo-app/ and web/; `@types/node` bumped to 22 everywhere.
 - agents/: vitest 3.x → 5.x.
 - agents/ and demo-app/ tsconfig: `allowImportingTsExtensions`, so imports use `.ts` paths (tsx and Playwright run them directly). demo-app/ also typechecks `src/`.
@@ -47,4 +55,9 @@ All notable changes to this project are documented here. Format: Keep a Changelo
 - `demo-app/public/app.js` is plain JavaScript and isn't typechecked or linted.
 - Under `FLAKY=1` mainly the search test turns flaky, because actions wait up to 30 s for the product list while only `expect` uses the 5 s timeout.
 - No formatter or linter for agents/ and demo-app/ beyond `tsc` (no Prettier/ESLint there).
+- Runs only start manually via the API; schedules and the dashboard runs pages come in later steps. There is no endpoint to cancel a run yet.
+- Killing the Playwright process group uses Unix process groups (`Setpgid`), so the server doesn't build for Windows.
+- Run folders under `DATA_DIR/runs/` are never cleaned up (a trace is about 0.5 MB per failed attempt).
+- Only one Playwright project is assumed: with several, each project's result is stored under the same title and file.
+- With `BUGS=cart_badge,login_error` the manual suite fails only the cart badge test; `login_error` isn't covered by the baseline suite, so it needs generated tests.
 - `make dev` interleaves the three processes' output without prefixes, and `tsx watch` prints a few "Force killing" lines on Ctrl+C (harmless).

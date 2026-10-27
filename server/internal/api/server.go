@@ -14,12 +14,13 @@ import (
 type Server struct {
 	cfg    config.Config
 	store  *store.Store
+	runs   RunStarter
 	logger *slog.Logger
 }
 
 // New returns the API handler with all routes and middleware.
-func New(cfg config.Config, st *store.Store, logger *slog.Logger) http.Handler {
-	s := &Server{cfg: cfg, store: st, logger: logger}
+func New(cfg config.Config, st *store.Store, rs RunStarter, logger *slog.Logger) http.Handler {
+	s := &Server{cfg: cfg, store: st, runs: rs, logger: logger}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", s.handleHealth)
@@ -32,6 +33,12 @@ func New(cfg config.Config, st *store.Store, logger *slog.Logger) http.Handler {
 
 	mux.HandleFunc("GET /api/apps/{id}/tests", s.handleListTests)
 	mux.HandleFunc("PATCH /api/tests/{id}", s.handleUpdateTest)
+
+	mux.HandleFunc("POST /api/apps/{id}/runs", s.handleStartRun)
+	mux.HandleFunc("GET /api/runs", s.handleListRuns)
+	mux.HandleFunc("GET /api/runs/{id}", s.handleGetRun)
+
+	mux.HandleFunc("GET /api/artifacts/{path...}", s.handleArtifact)
 
 	// Outermost first: log → recover → CORS → read-only → routes.
 	// Logging wraps recovery so the 500 from a panic is logged too.

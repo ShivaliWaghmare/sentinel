@@ -59,11 +59,28 @@ IDs are INTEGER PRIMARY KEY AUTOINCREMENT, so a deleted row's ID is never reused
 ## Lifecycles
 ### 1. Test run (manual or scheduled)
 1. POST /api/apps/{id}/runs, or a cron entry fires. The runs service refuses if the app already has an active run, then inserts a run with status running.
-2. runner: `npx playwright test tests/<slug> --reporter=json` in agents/, with BASE_URL, PLAYWRIGHT_JSON_OUTPUT_NAME=data/runs/<id>/report.json and PW_OUTPUT_DIR=data/runs/<id>/artifacts. One retry. Killed after RUN_TIMEOUT.
-3. Parse the report into test_results and upsert test_cases. A non-zero exit with a report is a normal failing run; no report means status error.
+2. runner: `npx playwright test tests/<slug> --reporter=json` in agents/ (or a single spec file, used later for heals), with BASE_URL, PLAYWRIGHT_JSON_OUTPUT_NAME=data/runs/<id>/report.json and PW_OUTPUT_DIR=data/runs/<id>/artifacts. One retry. Playwright runs in its own process group; after RUN_TIMEOUT, or when the server stops, the whole group (npx, node, browsers) is killed.
+3. Parse the report into test_results and upsert test_cases. A non-zero exit with a report is a normal failing run; no report, a timeout or a report with no tests means status error.
+   - Title: describe titles and the test title joined with " › ". File: relative to agents/ (`tests/<slug>/manual/x.spec.ts`).
+   - Status: Playwright `expected` → passed, `flaky` → flaky, `skipped` → skipped, anything else → failed. Duration is summed over attempts; retries = attempts − 1.
+   - Error and artifacts come from the last attempt that did not pass (for a flaky test, the failed attempt before the passing retry). The error is its first error message with ANSI codes stripped.
+   - Origin comes from the folder: `manual/` or `generated/` directly under `tests/<slug>/`. Results from other paths are stored with test_case_id null.
 4. If tests failed: triage. Rules first (passed on retry → flaky; connection refused, DNS or net::ERR_ errors → environment). Remaining failures go to one triage agent run; wait up to TRIAGE_TIMEOUT.
 5. Failures classified ui_change start a heal agent run in the background; its proposals wait for approval.
-6. Finish the run and send notifications: counts, each failure with its triage category and summary, and a dashboard link.
+6. Finish the run and send notifications: counts, each failure with its triage category and summary, and a dashboard link. The runs service calls a Notifier interface; notification errors are logged and never change the run.
+
+Run status rules:
+- running while Playwright runs (queued is reserved for later; it counts as active).
+- failed if at least one test failed; passed otherwise. Flaky and skipped tests are counted but don't fail the run.
+- error if Playwright produced no usable report, timed out, ran no tests, or the server stopped during the run. The run's error field says which; for a missing report it includes the tail of playwright.log.
+- At boot, runs still queued or running are marked error ("server restarted").
+- At most one active (queued or running) run per app; the check and insert are one SQL statement.
+
+Run folder (DATA_DIR/runs/<id>/):
+- report.json: Playwright's JSON report.
+- playwright.log: combined stdout and stderr.
+- artifacts/<test folder>/: test-failed-1.png (screenshot), trace.zip, url.txt, aria-snapshot.txt. The fixture's url.txt and aria-snapshot.txt arrive inlined in report.json as base64; the runner writes them next to the screenshot so every artifact is a file.
+- test_results.artifacts_json maps screenshot, trace, url and aria_snapshot to paths relative to DATA_DIR.
 
 ### 2. Explore
 1. POST /api/apps/{id}/explore {max_pages?, max_tests?} creates an agent run. The supervisor writes data/agent-runs/<id>/input.json and spawns the CLI.
@@ -122,11 +139,18 @@ Every endpoint follows these rules:
 - GET, POST /api/apps · GET, PATCH, DELETE /api/apps/{id}. POST {name, base_url, notes?, allow_destructive?} generates the slug and creates agents/tests/<slug>/{manual,generated}. PATCH can change those four fields, not the slug. DELETE removes the app's rows (cascade) and leaves its test files on disk.
 - GET /api/apps/{id}/tests?origin&status · PATCH /api/tests/{id} {status} · GET /api/tests/{id}/source
 - POST /api/apps/{id}/runs · GET /api/runs?app_id&limit · GET /api/runs/{id} (results with triage)
+  - POST starts a manual run: 202 with the run (status running), 404 unknown app, 409 `{"error": "app 1 already has an active run (run 7)"}`.
+  - Run fields: id, app_id, trigger, status, total, passed, failed, flaky, skipped, duration_ms, error (null if none), started_at, finished_at (null while running).
+  - GET /api/runs → {"runs": [...]} newest first, without results. app_id filters by app; limit defaults to 20, maximum 100; invalid values are a 400.
+  - GET /api/runs/{id} → the run plus results: [{id, test_case_id, title, file_path, line, status, duration_ms, error, retries, artifacts: {screenshot?, trace?, url?, aria_snapshot?}}]. Triage is added with lifecycle step 4.
 - GET, POST /api/schedules?app_id · PATCH, DELETE /api/schedules/{id} · GET /api/schedules/preview?cron= (next 5 fire times)
 - POST /api/apps/{id}/probe · POST /api/apps/{id}/explore · POST /api/apps/{id}/heal {test_result_ids}
 - GET /api/agent-runs?app_id&kind · GET /api/agent-runs/{id} · GET /api/agent-runs/{id}/events (SSE) · POST /api/agent-runs/{id}/cancel
 - GET /api/heal-proposals?status · GET /api/heal-proposals/{id} · PATCH /api/heal-proposals/{id}
 - GET /api/artifacts/{path...}: serves files under DATA_DIR only; path traversal blocked
+  - Allowed folders: DATA_DIR/runs/ (agent-runs/ is added when agent runs exist). Everything else in DATA_DIR, including sentinel.db, is a 404.
+  - The path must be clean and relative: "..", ".", empty segments, backslashes and absolute paths are a 400. Symlinks are resolved and the real file must stay inside the allowed folder; directories and missing files are a 404.
+  - Content-Type by extension: png → image/png, zip → application/zip, txt/log/md → text/plain; charset=utf-8, json → application/json, anything else → application/octet-stream. Always sent with X-Content-Type-Options: nosniff.
 - GET /api/stats/overview · GET /api/evals/latest · POST /api/notify/test
 
 ## Demo app (demo-app/)
@@ -166,6 +190,6 @@ Experiments: coverage and validity, bug detection (manual vs generated suites), 
 web/.env.local: NEXT_PUBLIC_API_URL=http://localhost:8080
 
 ## Security notes
-- The artifact endpoint only serves files inside DATA_DIR.
+- The artifact endpoint only serves files inside DATA_DIR's allowed folders (runs/ for now), never the database; symlinks escaping them are refused.
 - The API has no authentication (local tool). Public deployments set DEMO_READ_ONLY=true so visitors can't start runs or spend API credits.
 - Page content is untrusted input to the LLM (prompt injection); see CLAUDE.md agent rules.

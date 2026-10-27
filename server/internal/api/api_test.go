@@ -11,28 +11,44 @@ import (
 	"testing"
 
 	"github.com/ShivaliWaghmare/sentinel/server/internal/config"
+	"github.com/ShivaliWaghmare/sentinel/server/internal/runner"
+	"github.com/ShivaliWaghmare/sentinel/server/internal/runs"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/store"
 )
 
 const testOrigin = "http://localhost:3000"
 
 type testEnv struct {
-	h     http.Handler
-	store *store.Store
-	cfg   config.Config
+	h      http.Handler
+	store  *store.Store
+	cfg    config.Config
+	runs   *runs.Service
+	runner *fakeRunner
 }
 
-// newTestEnv builds the full handler on a temporary database and AGENTS_DIR.
-// mutate, if given, adjusts the config first.
+// fakeRunner stands in for Playwright. Run blocks until release is closed,
+// so tests control how long a run stays active, then returns report.
+type fakeRunner struct {
+	release chan struct{}
+	report  runner.Report
+}
+
+func (f *fakeRunner) Run(ctx context.Context, _ runner.Spec) (runner.Report, error) {
+	select {
+	case <-f.release:
+		return f.report, nil
+	case <-ctx.Done():
+		return runner.Report{}, ctx.Err()
+	}
+}
+
+// newTestEnv builds the full handler on a temporary DATA_DIR, database and
+// AGENTS_DIR, with a runs service backed by a fakeRunner. mutate, if given,
+// adjusts the config first.
 func newTestEnv(t *testing.T, mutate func(*config.Config)) testEnv {
 	t.Helper()
-	st, err := store.Open(context.Background(), t.TempDir())
-	if err != nil {
-		t.Fatalf("store.Open: %v", err)
-	}
-	t.Cleanup(func() { st.Close() })
-
 	cfg := config.Config{
+		DataDir:     t.TempDir(),
 		AgentsDir:   t.TempDir(),
 		CORSOrigin:  testOrigin,
 		LLMProvider: "gemini",
@@ -41,7 +57,21 @@ func newTestEnv(t *testing.T, mutate func(*config.Config)) testEnv {
 	if mutate != nil {
 		mutate(&cfg)
 	}
-	return testEnv{h: New(cfg, st, discardLogger()), store: st, cfg: cfg}
+	st, err := store.Open(context.Background(), cfg.DataDir)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+
+	fr := &fakeRunner{release: make(chan struct{})}
+	ctx, cancel := context.WithCancel(context.Background())
+	svc := runs.New(ctx, st, fr, runs.NopNotifier{}, cfg.DataDir, discardLogger())
+	// Stop runs the test left active before closing the database.
+	t.Cleanup(func() {
+		cancel()
+		svc.Wait()
+		st.Close()
+	})
+	return testEnv{h: New(cfg, st, svc, discardLogger()), store: st, cfg: cfg, runs: svc, runner: fr}
 }
 
 func discardLogger() *slog.Logger {
