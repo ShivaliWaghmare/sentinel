@@ -51,6 +51,38 @@ All notable changes to this project are documented here. Format: Keep a Changelo
   - `POST /api/notify/test` sends a sample "[Test]" report to every configured channel and returns per-channel `{configured, ok, error}`.
 - Tests: cron validation table, next fire times in Asia/Kolkata from a fixed clock (`0 9 * * 1,4`, `*/2`, `@daily`, never-firing), firing/skip/removal with a real runs service; Slack payload golden file (`notify/testdata/slack_failed_run.golden.json`, refresh with `go test ./internal/notify -update`), httptest webhook (success, Slack error reason, no URL leak), email MIME structure (parts, order, encoding, escaping, line length), a fake SMTP server that checks STARTTLS before AUTH and refuses to send without it, NOTIFY_ON per run status, and handler tests for schedules and notify/test.
 - ADR-0007: schedule and notification semantics (skip instead of queue, one time zone, no catch-up after downtime, NOTIFY_ON).
+- Agent plumbing (roadmap step 7), `agents/src`:
+  - `llm/`: provider-neutral `LLMProvider` (system prompt, multi-turn messages, tool calls, structured JSON output from a zod schema, images, token usage, abort signal). Adapters `gemini.ts` (@google/genai 2.31: `parametersJsonSchema`, `responseJsonSchema`, thought signatures preserved by sending the model's turn back unchanged) and `anthropic.ts` (@anthropic-ai/sdk 1.3: `input_schema`, `output_config.format`); SDK retries are off. `RetryingProvider`: 429/5xx/network errors, 4 attempts, exponential backoff with full jitter, a warning event per retry. `FakeProvider` for tests. `pricing.ts` with placeholder prices; unknown models cost 0 with one warning.
+  - `core/`: `events.ts` (only stdout writer, increasing seq, flush before exit, console.log/info/debug → stderr), `tools.ts` (`defineTool`, zod → JSON Schema, optional arg redaction for events), `budget.ts` (steps, cost, wall clock; `BudgetExceeded`; an abort signal so a slow LLM call can't outlive the budget), `untrusted.ts`, `config.ts` (env with zod, Go-style durations), `agent-loop.ts` (zod-validated tool args with error results for self-correction, 4,000-character untrusted tool output, `finish` tool as the final answer with one corrective retry, text-only replies nudged, an `llm_call` event per call with tokens, cost and latency).
+  - `browser/`: Chromium session with baseURL that aborts main-frame navigations to other origins; snapshot (aria snapshot + interactive elements with role, name, test id, label, placeholder, href; truncated); destructive-action guard (delete, remove account, pay, purchase, place order, send) unless `allow_destructive`.
+  - `prompts/`: loader for `*.md` templates with a `version:` header and `{{variables}}` (missing values are errors); versions are recorded in `run_started`. `probe.system.md` and `probe.task.md`.
+  - `cli.ts`: `probe`, `explore`, `triage`, `heal` (the last three end with done failed "not implemented yet"). zod-validated `--input`, loads the repo `.env` without overriding the environment, `run_started` … `done` (summary always has usage), SIGTERM → done cancelled.
+  - `agents/probe`: tools open_page, snapshot, click, fill (password values redacted in events) and finish; output `{app_summary, flows[]}`.
+  - Unit tests (vitest, FakeProvider): tool call then final answer; invalid args then correction; unknown tool and tool exceptions; step and cost budgets; invalid final answer with one corrective retry, and failure after it; text-only nudge; redaction; strictly increasing seq. Plus events, untrusted, guards, prompt loader, retry/backoff, config and pricing.
+- Agent supervisor and SSE (`server/internal/agents`, `server/internal/sse`):
+  - Supervisor: queued beyond `AGENT_CONCURRENCY` (oldest first when a slot frees), `DATA_DIR/agent-runs/<id>/input.json`, `npx tsx src/cli.ts <kind> --input <file>` in its own process group, stderr to `agent.log`, stdout through a server-owned pipe read line by line (1 MB lines). Each event is stored with its usage in one transaction and published; invalid lines, events after done and out-of-order seqs become warnings. Server-owned seq. A done is written by the server when the CLI never writes one (failed with the stderr tail, cancelled, timeout, shutdown). AGENT_TIMEOUT + 30 s kills the group; cancel is SIGTERM then SIGKILL after 10 s; stray group members holding stdout are killed 10 s after the CLI exits. Boot recovery marks queued/running agent runs failed. `OnDone` callbacks per kind.
+  - SSE broker: in-memory pub/sub per agent run; slow subscribers (256 events behind) are dropped and catch up on reconnect.
+  - Store: agent runs (create, start queued, oldest queued, finish once, get, list with app/kind filters, fail interrupted) and agent events (append with usage, list after seq).
+  - API: `POST /api/apps/{id}/probe` (202), `GET /api/agent-runs?app_id&kind&limit`, `GET /api/agent-runs/{id}`, `POST /api/agent-runs/{id}/cancel` (202 / 409), `GET /api/agent-runs/{id}/events` (replay after Last-Event-ID or `?last_event_id=`, live stream, 15 s heartbeat, closes after done). The artifact endpoint also serves `DATA_DIR/agent-runs/`.
+  - Tests: supervisor with fake CLI scripts (events with a malformed line, an unknown type and an event after done; exit without done; cancel via SIGTERM; SIGKILL after the cancel grace; timeout kill; a stray child holding stdout; queueing and cancelling a queued run; recovery), broker, store, handlers, SSE replay from Last-Event-ID and live streaming.
+- ADR-0008: agent run supervision (server-owned seq, a done for every run, layered timeouts, queueing, finish tool).
+- LLM reliability, after the first live probe ran out of its 20-minute budget in 4 calls:
+  - `LLM_CALL_TIMEOUT` (default 60s): each LLM request attempt gets its own timeout; a timed-out attempt is retried and the final error says "timed out after N s (LLM_CALL_TIMEOUT)". Added to `.env.example`, the Go config (validated positive) and the Configuration table.
+  - Rate limits and quotas: the Gemini adapter reads `google.rpc.RetryInfo.retryDelay` and `QuotaFailure` from 429 bodies (zod-validated); Anthropic reads `retry-after`. The retry layer waits the provider-requested delay instead of backing off, fails at once when the delay is over 60 s (a daily quota), and says "quota exceeded" (per-day quota) or "rate limited" (other 429s), plus "(gave up after 4 attempts)" when retries run out. `LLMError` carries `reason` and `retryAfterMs`.
+  - The probe has its own 3-minute wall-clock budget (`PROBE_BUDGET`); agents can tighten the configured AGENT_* limits but never extend them (`limitsFor`).
+  - Tests: provider-requested delay, daily quota with no retry, a stuck call timed out and retried, repeated timeouts, the caller's deadline left alone, parsing of the real Gemini daily-quota body and a per-minute body, `LLM_CALL_TIMEOUT` config, probe budget; store and supervisor tests for the atomic done.
+- Free-tier protection (20 requests per model per day):
+  - `LLM_RPM` (default 5, 0 = off): `llm/pacer.ts` spaces every request, retries included, 60/LLM_RPM seconds apart.
+  - `LLM_MAX_REQUESTS_PER_RUN` (default 15): a request budget next to steps, cost and time. Every request counts, retries included, and is checked before it is sent; hitting it ends the run with budget_exceeded ("request budget exhausted (15 of 15 LLM requests, LLM_MAX_REQUESTS_PER_RUN)").
+  - A provider-requested retry wait longer than the time left in the run's budget fails at once with the "rate limited" message plus "not retrying: the requested wait (47 s) is longer than the 20 s left in this run's budget", instead of sleeping into budget_exceeded.
+  - `llm_call` events carry `requests` (1 plus retries) and `wait_ms` (pacing and retry waits, included in latency_ms); the done summary's usage has `requests`.
+  - Both settings are in `.env.example`, the Go config (validated) and the Configuration table.
+  - Tests: pacer spacing, pacing of retries with a fake clock, fail-fast on a wait past the deadline, a wait that fits, onAttempt counting and stopping before a request is sent, requests/wait on the response and on llm_call, the request budget ending the loop (retries counted), config parsing in both languages.
+- Fewer LLM requests per agent run:
+  - Shared browser tools (`agents/src/browser/tools.ts`): open_page, click and fill return their outcome followed by the resulting page snapshot (same format and truncation as snapshot()), so the agent doesn't need a snapshot call after each action. snapshot() stays for pages that change on their own. The Explorer's browser tools will follow the same convention (ARCHITECTURE.md, "Browser tool convention").
+  - The probe uses the shared tools and has its own budgets: 15 LLM requests and 4 minutes (`PROBE_BUDGET`; was 3 minutes), capped by the configured AGENT_TIMEOUT and LLM_MAX_REQUESTS_PER_RUN.
+  - `probe.system.md` v2: describes the snapshot-returning tools, the small request budget, and calling independent actions (filling a form, then submitting) in one turn.
+  - Tests: the browser tools against real Chromium and a local HTTP server (each action returns the new page's snapshot, snapshot() alone, destructive click refused, off-origin open refused, blocked off-origin click returns to the page, missing elements, password redaction); probe budget.
 
 ### Changed
 - `api.New` takes the runs service (a `RunStarter`) in addition to config, store and logger.
@@ -61,6 +93,13 @@ All notable changes to this project are documented here. Format: Keep a Changelo
 - agents/: vitest 3.x → 5.x.
 - agents/ and demo-app/ tsconfig: `allowImportingTsExtensions`, so imports use `.ts` paths (tsx and Playwright run them directly). demo-app/ also typechecks `src/`.
 - ARCHITECTURE.md: FLAKY now means 4–8 s delays on the products API (no failures), plus details on ShopLite state, startup validation and `/__health`.
+- ARCHITECTURE.md: agent CLI and LLM layer details, the agent run lifecycle (queueing, input.json, server-owned seq, synthesized done, layered timeouts, cancel, run folder), event protocol additions (`run_started.prompts`, `done.error`, `summary.usage`), agent loop rules, the probe agent, agent-run endpoints and SSE format, and the agent-runs artifact folder.
+- `config`: AGENT_CONCURRENCY must be at least 1 and AGENT_TIMEOUT positive.
+- `api.Services` also takes the agent supervisor and the SSE broker.
+- agents/: added @google/genai and @anthropic-ai/sdk (both already in DEPENDENCIES.md).
+- Supervisor: a done event (from the CLI or written by the server) is stored together with the run's final status in one transaction (`store.AppendDoneEvent`) before it is published. Before, `GET /api/agent-runs/{id}` right after the SSE stream closed could still say running.
+- `pricing.ts`: placeholder price for gemini-3.5-flash.
+- Browser session: after an off-origin navigation is blocked, it returns to the page the action started from. Before, Chromium left the tab on `chrome-error://chromewebdata/` and the agent was stranded on an empty page (found by the new browser tool tests).
 
 ### Known gaps
 - `npm audit` reports 5 high-severity advisories in web/ dev dependencies from create-next-app; not reviewed yet.
@@ -83,3 +122,18 @@ All notable changes to this project are documented here. Format: Keep a Changelo
 - Only one Playwright project is assumed: with several, each project's result is stored under the same title and file.
 - With `BUGS=cart_badge,login_error` the manual suite fails only the cart badge test; `login_error` isn't covered by the baseline suite, so it needs generated tests.
 - `make dev` interleaves the three processes' output without prefixes, and `tsx watch` prints a few "Force killing" lines on Ctrl+C (harmless).
+- LLM prices in `agents/src/llm/pricing.ts` are placeholders; costs and the cost budget are only as accurate as that table.
+- The probe has a `fill` tool that the step 7 spec didn't list: without it the probe can't get past ShopLite's login page.
+- The snapshot's accessible names are computed in the page by a simplified algorithm (aria-label, aria-labelledby, label, text, alt, title, placeholder), not the full accname spec.
+- Only the Gemini adapter was tested against the real API; the Anthropic adapter is typechecked but not run (no key configured). Neither adapter has unit tests of its own; the loop is tested with FakeProvider.
+- Images are only sent in user messages, not inside tool results.
+- Queued agent runs have no time limit while waiting.
+- The agent process group is signalled with Unix process groups (`Setpgid`), like the test runner.
+- Agent run folders under `DATA_DIR/agent-runs/` are never cleaned up.
+- The probe's task and prompts are not evaluated yet; its description quality was only checked by hand.
+- On the Gemini free tier the per-minute request limit dominated the successful ShopLite probe (gemini-3.5-flash, 18 calls): about 2 of its 3 minutes went to 429 retry delays. The probe now has snapshot-returning tools, 15 requests and 4 minutes, but it has not been run with these changes yet (planned after the daily quota resets); whether ShopLite fits in 15 requests is unverified.
+- Snapshots returned by actions count toward the 4,000-character tool output limit like before; on a large page the end of the interactive-elements list can be cut off.
+- Pacing is per agent process: with AGENT_CONCURRENCY above 1, runs pace independently and together can exceed LLM_RPM.
+- The request count is in events and the done summary, not in an agent_runs column.
+- A 429 that asks for a 0 s wait is retried at once and usually fails again, wasting an attempt.
+- gemini-3.8-flash (the `.env` model) hit the free-tier daily limit of 20 requests during development; the passing probe ran with `LLM_MODEL=gemini-3.5-flash` set only in the environment.

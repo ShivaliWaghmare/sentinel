@@ -26,6 +26,7 @@ func TestArtifactServesFiles(t *testing.T) {
 	writeFile(t, dir, "runs/1/artifacts/t/trace.zip", "PK fake")
 	writeFile(t, dir, "runs/1/artifacts/t/url.txt", "http://localhost:4000/cart")
 	writeFile(t, dir, "runs/1/artifacts/t/data.bin", "raw")
+	writeFile(t, dir, "agent-runs/4/agent.log", "agent stderr")
 
 	tests := []struct {
 		path        string
@@ -36,6 +37,7 @@ func TestArtifactServesFiles(t *testing.T) {
 		{"runs/1/artifacts/t/trace.zip", "application/zip", "PK fake"},
 		{"runs/1/artifacts/t/url.txt", "text/plain; charset=utf-8", "http://localhost:4000/cart"},
 		{"runs/1/artifacts/t/data.bin", "application/octet-stream", "raw"},
+		{"agent-runs/4/agent.log", "text/plain; charset=utf-8", "agent stderr"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {

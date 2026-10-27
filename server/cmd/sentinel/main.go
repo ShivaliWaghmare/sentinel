@@ -14,12 +14,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ShivaliWaghmare/sentinel/server/internal/agents"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/api"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/config"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/notify"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/runner"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/runs"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/scheduler"
+	"github.com/ShivaliWaghmare/sentinel/server/internal/sse"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/store"
 )
 
@@ -67,6 +69,16 @@ func run() error {
 	// writing before the database closes.
 	defer runSvc.Wait()
 
+	// Agent runs, like test runs, are killed on shutdown and recorded as
+	// failed before the database closes.
+	broker := sse.NewBroker()
+	agentSup := agents.New(ctx, st, broker,
+		agents.DefaultOptions(cfg.AgentsDir, cfg.DataDir, cfg.AgentConcurrency, cfg.AgentTimeout), slog.Default())
+	if err := agentSup.Recover(ctx); err != nil {
+		return err
+	}
+	defer agentSup.Wait()
+
 	// config.Load already checked that TIMEZONE loads.
 	loc, err := time.LoadLocation(cfg.Timezone)
 	if err != nil {
@@ -84,7 +96,7 @@ func run() error {
 	srv := &http.Server{
 		Addr: ":" + strconv.Itoa(cfg.Port),
 		Handler: api.New(cfg, st, api.Services{
-			Runs: runSvc, Scheduler: sched, Notifier: notifier,
+			Runs: runSvc, Scheduler: sched, Notifier: notifier, Agents: agentSup, Broker: broker,
 		}, slog.Default()),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

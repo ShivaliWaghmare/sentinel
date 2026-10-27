@@ -46,6 +46,14 @@ func TestBuildValues(t *testing.T) {
 		{"notify on failures", map[string]string{"NOTIFY_ON": "failures"}, func(c Config) bool { return c.NotifyOn == NotifyFailures }, ""},
 		{"bad notify on", map[string]string{"NOTIFY_ON": "never"}, nil, "NOTIFY_ON"},
 		{"bad timezone", map[string]string{"TIMEZONE": "Mars/Base"}, nil, "TIMEZONE"},
+		{"zero agent concurrency", map[string]string{"AGENT_CONCURRENCY": "0"}, nil, "AGENT_CONCURRENCY"},
+		{"zero agent timeout", map[string]string{"AGENT_TIMEOUT": "0s"}, nil, "AGENT_TIMEOUT"},
+		{"llm call timeout", map[string]string{"LLM_CALL_TIMEOUT": "45s"}, func(c Config) bool { return c.LLMCallTimeout == 45*time.Second }, ""},
+		{"zero llm call timeout", map[string]string{"LLM_CALL_TIMEOUT": "0s"}, nil, "LLM_CALL_TIMEOUT"},
+		{"llm pacing defaults", map[string]string{}, func(c Config) bool { return c.LLMRPM == 5 && c.LLMMaxRequests == 15 }, ""},
+		{"llm pacing off", map[string]string{"LLM_RPM": "0"}, func(c Config) bool { return c.LLMRPM == 0 }, ""},
+		{"negative llm rpm", map[string]string{"LLM_RPM": "-1"}, nil, "LLM_RPM"},
+		{"zero llm requests", map[string]string{"LLM_MAX_REQUESTS_PER_RUN": "0"}, nil, "LLM_MAX_REQUESTS_PER_RUN"},
 		{"all errors reported", map[string]string{"PORT": "x", "SMTP_PORT": "y"}, nil, "SMTP_PORT"},
 	}
 	for _, tt := range tests {

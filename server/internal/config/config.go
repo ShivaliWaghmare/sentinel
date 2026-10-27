@@ -31,6 +31,9 @@ type Config struct {
 	LLMProvider     string
 	LLMModel        string
 	LLMVision       bool
+	LLMCallTimeout  time.Duration // per LLM request; read by the agent CLI
+	LLMRPM          int           // requests per minute, 0 = no pacing; read by the agent CLI
+	LLMMaxRequests  int           // LLM requests per agent run; read by the agent CLI
 	GeminiAPIKey    string
 	AnthropicAPIKey string
 
@@ -90,6 +93,9 @@ func build(get func(string) string, baseDir string) (Config, error) {
 		LLMProvider:     p.str("LLM_PROVIDER", "gemini"),
 		LLMModel:        p.str("LLM_MODEL", ""),
 		LLMVision:       p.bool("LLM_VISION", true),
+		LLMCallTimeout:  p.duration("LLM_CALL_TIMEOUT", 60*time.Second),
+		LLMRPM:          p.int("LLM_RPM", 5),
+		LLMMaxRequests:  p.int("LLM_MAX_REQUESTS_PER_RUN", 15),
 		GeminiAPIKey:    p.str("GEMINI_API_KEY", ""),
 		AnthropicAPIKey: p.str("ANTHROPIC_API_KEY", ""),
 
@@ -115,6 +121,21 @@ func build(get func(string) string, baseDir string) (Config, error) {
 	}
 	if c.NotifyOn != NotifyAll && c.NotifyOn != NotifyFailures {
 		return Config{}, fmt.Errorf("config: NOTIFY_ON must be all or failures, got %q", c.NotifyOn)
+	}
+	if c.AgentConcurrency < 1 {
+		return Config{}, fmt.Errorf("config: AGENT_CONCURRENCY must be at least 1, got %d", c.AgentConcurrency)
+	}
+	if c.LLMRPM < 0 {
+		return Config{}, fmt.Errorf("config: LLM_RPM must be 0 (no pacing) or more, got %d", c.LLMRPM)
+	}
+	if c.LLMMaxRequests < 1 {
+		return Config{}, fmt.Errorf("config: LLM_MAX_REQUESTS_PER_RUN must be at least 1, got %d", c.LLMMaxRequests)
+	}
+	if c.LLMCallTimeout <= 0 {
+		return Config{}, fmt.Errorf("config: LLM_CALL_TIMEOUT must be positive, got %s", c.LLMCallTimeout)
+	}
+	if c.AgentTimeout <= 0 {
+		return Config{}, fmt.Errorf("config: AGENT_TIMEOUT must be positive, got %s", c.AgentTimeout)
 	}
 	if _, err := time.LoadLocation(c.Timezone); err != nil {
 		return Config{}, fmt.Errorf("config: TIMEZONE: %w", err)
@@ -151,6 +172,9 @@ func (c Config) LogValue() slog.Value {
 		slog.String("llm_provider", c.LLMProvider),
 		slog.String("llm_model", c.LLMModel),
 		slog.Bool("llm_vision", c.LLMVision),
+		slog.Duration("llm_call_timeout", c.LLMCallTimeout),
+		slog.Int("llm_rpm", c.LLMRPM),
+		slog.Int("llm_max_requests_per_run", c.LLMMaxRequests),
 		slog.String("gemini_api_key", set(c.GeminiAPIKey)),
 		slog.String("anthropic_api_key", set(c.AnthropicAPIKey)),
 		slog.Int("agent_max_steps", c.AgentMaxSteps),

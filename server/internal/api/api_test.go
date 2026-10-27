@@ -11,11 +11,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ShivaliWaghmare/sentinel/server/internal/agents"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/config"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/notify"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/runner"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/runs"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/scheduler"
+	"github.com/ShivaliWaghmare/sentinel/server/internal/sse"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/store"
 )
 
@@ -28,6 +30,7 @@ type testEnv struct {
 	runs   *runs.Service
 	runner *fakeRunner
 	sched  *scheduler.Scheduler
+	agents *agents.Supervisor
 }
 
 // fakeRunner stands in for Playwright. Run blocks until release is closed,
@@ -72,10 +75,13 @@ func newTestEnv(t *testing.T, mutate func(*config.Config)) testEnv {
 	fr := &fakeRunner{release: make(chan struct{})}
 	ctx, cancel := context.WithCancel(context.Background())
 	svc := runs.New(ctx, st, fr, runs.NopNotifier{}, cfg.DataDir, discardLogger())
+	broker := sse.NewBroker()
+	sup := agents.New(ctx, st, broker, fakeAgentOptions(t, cfg), discardLogger())
 	// Stop runs the test left active before closing the database.
 	t.Cleanup(func() {
 		cancel()
 		svc.Wait()
+		sup.Wait()
 		st.Close()
 	})
 	loc, err := time.LoadLocation(cfg.Timezone)
@@ -83,8 +89,10 @@ func newTestEnv(t *testing.T, mutate func(*config.Config)) testEnv {
 		t.Fatalf("LoadLocation: %v", err)
 	}
 	sched := scheduler.New(ctx, st, svc, loc, discardLogger())
-	h := New(cfg, st, Services{Runs: svc, Scheduler: sched, Notifier: notify.New(cfg, discardLogger())}, discardLogger())
-	return testEnv{h: h, store: st, cfg: cfg, runs: svc, runner: fr, sched: sched}
+	h := New(cfg, st, Services{
+		Runs: svc, Scheduler: sched, Notifier: notify.New(cfg, discardLogger()), Agents: sup, Broker: broker,
+	}, discardLogger())
+	return testEnv{h: h, store: st, cfg: cfg, runs: svc, runner: fr, sched: sched, agents: sup}
 }
 
 func discardLogger() *slog.Logger {

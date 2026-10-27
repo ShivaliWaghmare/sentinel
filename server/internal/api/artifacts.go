@@ -10,7 +10,7 @@ import (
 
 // artifactRoots are the DATA_DIR folders the artifact endpoint may serve.
 // Everything else in DATA_DIR (such as sentinel.db) stays private.
-var artifactRoots = map[string]bool{"runs": true}
+var artifactRoots = map[string]bool{"runs": true, "agent-runs": true}
 
 // artifactTypes sets the Content-Type by extension; anything else is served
 // as a download (application/octet-stream).
