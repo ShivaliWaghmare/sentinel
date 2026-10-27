@@ -7,20 +7,31 @@ import (
 	"strconv"
 
 	"github.com/ShivaliWaghmare/sentinel/server/internal/config"
+	"github.com/ShivaliWaghmare/sentinel/server/internal/notify"
+	"github.com/ShivaliWaghmare/sentinel/server/internal/scheduler"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/store"
 )
 
+// Services are the long-lived components the handlers call besides the store.
+type Services struct {
+	Runs      RunStarter
+	Scheduler *scheduler.Scheduler
+	Notifier  *notify.Notifier
+}
+
 // Server holds what the handlers need.
 type Server struct {
-	cfg    config.Config
-	store  *store.Store
-	runs   RunStarter
-	logger *slog.Logger
+	cfg      config.Config
+	store    *store.Store
+	runs     RunStarter
+	sched    *scheduler.Scheduler
+	notifier *notify.Notifier
+	logger   *slog.Logger
 }
 
 // New returns the API handler with all routes and middleware.
-func New(cfg config.Config, st *store.Store, rs RunStarter, logger *slog.Logger) http.Handler {
-	s := &Server{cfg: cfg, store: st, runs: rs, logger: logger}
+func New(cfg config.Config, st *store.Store, svc Services, logger *slog.Logger) http.Handler {
+	s := &Server{cfg: cfg, store: st, runs: svc.Runs, sched: svc.Scheduler, notifier: svc.Notifier, logger: logger}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", s.handleHealth)
@@ -37,6 +48,14 @@ func New(cfg config.Config, st *store.Store, rs RunStarter, logger *slog.Logger)
 	mux.HandleFunc("POST /api/apps/{id}/runs", s.handleStartRun)
 	mux.HandleFunc("GET /api/runs", s.handleListRuns)
 	mux.HandleFunc("GET /api/runs/{id}", s.handleGetRun)
+
+	mux.HandleFunc("GET /api/schedules", s.handleListSchedules)
+	mux.HandleFunc("POST /api/schedules", s.handleCreateSchedule)
+	mux.HandleFunc("GET /api/schedules/preview", s.handlePreviewSchedule)
+	mux.HandleFunc("PATCH /api/schedules/{id}", s.handleUpdateSchedule)
+	mux.HandleFunc("DELETE /api/schedules/{id}", s.handleDeleteSchedule)
+
+	mux.HandleFunc("POST /api/notify/test", s.handleNotifyTest)
 
 	mux.HandleFunc("GET /api/artifacts/{path...}", s.handleArtifact)
 

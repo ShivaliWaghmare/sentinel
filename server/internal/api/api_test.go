@@ -9,10 +9,13 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ShivaliWaghmare/sentinel/server/internal/config"
+	"github.com/ShivaliWaghmare/sentinel/server/internal/notify"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/runner"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/runs"
+	"github.com/ShivaliWaghmare/sentinel/server/internal/scheduler"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/store"
 )
 
@@ -24,6 +27,7 @@ type testEnv struct {
 	cfg    config.Config
 	runs   *runs.Service
 	runner *fakeRunner
+	sched  *scheduler.Scheduler
 }
 
 // fakeRunner stands in for Playwright. Run blocks until release is closed,
@@ -43,8 +47,9 @@ func (f *fakeRunner) Run(ctx context.Context, _ runner.Spec) (runner.Report, err
 }
 
 // newTestEnv builds the full handler on a temporary DATA_DIR, database and
-// AGENTS_DIR, with a runs service backed by a fakeRunner. mutate, if given,
-// adjusts the config first.
+// AGENTS_DIR, with a runs service backed by a fakeRunner, a scheduler in
+// Asia/Kolkata that is never started (tests fire nothing on their own) and a
+// notifier built from the config. mutate, if given, adjusts the config first.
 func newTestEnv(t *testing.T, mutate func(*config.Config)) testEnv {
 	t.Helper()
 	cfg := config.Config{
@@ -53,6 +58,8 @@ func newTestEnv(t *testing.T, mutate func(*config.Config)) testEnv {
 		CORSOrigin:  testOrigin,
 		LLMProvider: "gemini",
 		SMTPHost:    "smtp.gmail.com",
+		Timezone:    "Asia/Kolkata",
+		NotifyOn:    config.NotifyAll,
 	}
 	if mutate != nil {
 		mutate(&cfg)
@@ -71,7 +78,13 @@ func newTestEnv(t *testing.T, mutate func(*config.Config)) testEnv {
 		svc.Wait()
 		st.Close()
 	})
-	return testEnv{h: New(cfg, st, svc, discardLogger()), store: st, cfg: cfg, runs: svc, runner: fr}
+	loc, err := time.LoadLocation(cfg.Timezone)
+	if err != nil {
+		t.Fatalf("LoadLocation: %v", err)
+	}
+	sched := scheduler.New(ctx, st, svc, loc, discardLogger())
+	h := New(cfg, st, Services{Runs: svc, Scheduler: sched, Notifier: notify.New(cfg, discardLogger())}, discardLogger())
+	return testEnv{h: h, store: st, cfg: cfg, runs: svc, runner: fr, sched: sched}
 }
 
 func discardLogger() *slog.Logger {
@@ -206,6 +219,12 @@ func TestReadOnlyMode(t *testing.T) {
 		{"PATCH", "/api/apps/1", `{"notes":"x"}`, http.StatusForbidden},
 		{"DELETE", "/api/apps/1", "", http.StatusForbidden},
 		{"PATCH", "/api/tests/1", `{"status":"retired"}`, http.StatusForbidden},
+		{"GET", "/api/schedules", "", http.StatusOK},
+		{"GET", "/api/schedules/preview?cron=@daily", "", http.StatusOK},
+		{"POST", "/api/schedules", `{"app_id":1,"cron":"@daily"}`, http.StatusForbidden},
+		{"PATCH", "/api/schedules/1", `{"enabled":false}`, http.StatusForbidden},
+		{"DELETE", "/api/schedules/1", "", http.StatusForbidden},
+		{"POST", "/api/notify/test", "", http.StatusForbidden},
 	}
 	for _, tt := range tests {
 		t.Run(tt.method+" "+tt.path, func(t *testing.T) {

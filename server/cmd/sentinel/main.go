@@ -16,8 +16,10 @@ import (
 
 	"github.com/ShivaliWaghmare/sentinel/server/internal/api"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/config"
+	"github.com/ShivaliWaghmare/sentinel/server/internal/notify"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/runner"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/runs"
+	"github.com/ShivaliWaghmare/sentinel/server/internal/scheduler"
 	"github.com/ShivaliWaghmare/sentinel/server/internal/store"
 )
 
@@ -55,7 +57,9 @@ func run() error {
 
 	// Runs use ctx, so a shutdown signal kills in-flight Playwright processes.
 	pw := runner.New(cfg.AgentsDir, cfg.DataDir, cfg.RunTimeout)
-	runSvc := runs.New(ctx, st, pw, runs.NopNotifier{}, cfg.DataDir, slog.Default())
+	notifier := notify.New(cfg, slog.Default())
+	slog.Info("notifications", "slack", cfg.SlackConfigured(), "email", cfg.EmailConfigured(), "notify_on", cfg.NotifyOn)
+	runSvc := runs.New(ctx, st, pw, notifier, cfg.DataDir, slog.Default())
 	if err := runSvc.Recover(ctx); err != nil {
 		return err
 	}
@@ -63,9 +67,25 @@ func run() error {
 	// writing before the database closes.
 	defer runSvc.Wait()
 
+	// config.Load already checked that TIMEZONE loads.
+	loc, err := time.LoadLocation(cfg.Timezone)
+	if err != nil {
+		return fmt.Errorf("load timezone: %w", err)
+	}
+	sched := scheduler.New(ctx, st, runSvc, loc, slog.Default())
+	if err := sched.Load(ctx); err != nil {
+		return err
+	}
+	sched.Start()
+	// Runs before runSvc.Wait: no new scheduled run can start while
+	// in-flight runs are being waited for.
+	defer sched.Stop()
+
 	srv := &http.Server{
-		Addr:              ":" + strconv.Itoa(cfg.Port),
-		Handler:           api.New(cfg, st, runSvc, slog.Default()),
+		Addr: ":" + strconv.Itoa(cfg.Port),
+		Handler: api.New(cfg, st, api.Services{
+			Runs: runSvc, Scheduler: sched, Notifier: notifier,
+		}, slog.Default()),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

@@ -42,9 +42,8 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 			APIKeyConfigured: s.llmKeyConfigured(),
 		},
 		Notifications: notificationsHealth{
-			Slack: s.cfg.SlackWebhookURL != "",
-			// Sending mail needs a server, credentials and a recipient.
-			Email: s.cfg.SMTPHost != "" && s.cfg.SMTPUser != "" && s.cfg.SMTPPass != "" && s.cfg.EmailTo != "",
+			Slack: s.cfg.SlackConfigured(),
+			Email: s.cfg.EmailConfigured(),
 		},
 	}
 	status := http.StatusOK

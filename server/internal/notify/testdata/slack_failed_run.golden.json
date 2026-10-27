@@ -1,0 +1,43 @@
+{
+  "text": "❌ ShopLite: 6/8 passed (run #12)",
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": "❌ ShopLite: 6/8 passed",
+        "emoji": true
+      }
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "Run #12 · Trigger: schedule · Duration: 1m 23s · Flaky: 1 · Skipped: 0"
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*cart › badge \u0026lt;count\u0026gt; \u0026amp; total*\n`Error: expect(locator).toHaveText(expected) failed`"
+      }
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "View run"
+          },
+          "url": "http://localhost:3000/runs/12",
+          "style": "primary"
+        }
+      ]
+    }
+  ]
+}

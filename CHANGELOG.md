@@ -38,9 +38,25 @@ All notable changes to this project are documented here. Format: Keep a Changelo
   - API: `POST /api/apps/{id}/runs` (202 / 409), `GET /api/runs?app_id&limit`, `GET /api/runs/{id}` with results, and `GET /api/artifacts/{path...}`. Artifacts are served only from `DATA_DIR/runs/`; `..`, absolute paths and symlinks escaping the folder are refused, and content types are set for png, zip and txt.
   - Tests: parser tests against two real Playwright 1.64 reports in `runner/testdata` (all passing; failure + flaky), runner tests with a shell script in place of Playwright (env and target, missing report, no tests, process-group kill on timeout, cancel), a runs service test with a fake runner, store tests, and handler tests including path traversal and symlink escapes.
 - ARCHITECTURE.md: run status rules, run folder layout, parsing rules, run and artifact endpoint details, and the allowed artifact folders.
+- Scheduled runs (lifecycle 1, step 1 by cron):
+  - `server/internal/scheduler`: robfig/cron v3.0.1 in the TIMEZONE location with a 5-field parser plus descriptors (@daily, @weekly, …). `Parse` also rejects `@every` and `TZ=`/`CRON_TZ=` prefixes (the latter would otherwise panic inside robfig's parser for input like `TZ=UTC`). Loads enabled schedules at boot; `Add`, `Remove`, `NextRuns(id, n)` and `Preview(spec, n)`. A firing re-reads its schedule (deleted or disabled → entry removed) and starts a run with trigger `schedule`; if the app already has an active run it is skipped and logged, never queued. Stopped on shutdown before in-flight runs are awaited.
+  - Store: schedules (create with app check, get, list by app, list enabled, enable/disable, delete).
+  - API: `GET/POST /api/schedules?app_id`, `PATCH /api/schedules/{id}` `{enabled}`, `DELETE /api/schedules/{id}`, `GET /api/schedules/preview?cron=` (validity, error, timezone and the next 5 fire times; 400 for an invalid expression). Each schedule includes `next_run`. Deleting an app also removes its cron entries.
+- Run notifications (lifecycle 1, step 6), `server/internal/notify`:
+  - A format-neutral report: status emoji, passed/total, trigger, duration, flaky and skipped counts, up to 10 failures with title and first error line, "and N more failures", run error for error runs, and a link to `DASHBOARD_URL/runs/<id>`.
+  - Slack: Incoming Webhook with Block Kit (header, context line, one section per failure, "View run" button, fallback text), mrkdwn-escaped and truncated to Slack's limits. The webhook URL is stripped from connection errors.
+  - Email: HTML with inline styles plus a plain-text alternative (multipart/alternative, quoted-printable), RFC 2047 subject like `❌ ShopLite: 6/8 passed (run #12)`, sent with `net/smtp` over required STARTTLS (works with Gmail app passwords on port 587). EMAIL_TO accepts a comma-separated list; EMAIL_FROM defaults to SMTP_USER.
+  - Each channel is enabled only when configured; failures are logged and never change the run. `STEP 9 (triage)` comments mark where triage category and summary go in both formats.
+  - `NOTIFY_ON`: `all` (default) or `failures` (only failed and error runs). Added to `.env.example` and the Configuration table.
+  - `POST /api/notify/test` sends a sample "[Test]" report to every configured channel and returns per-channel `{configured, ok, error}`.
+- Tests: cron validation table, next fire times in Asia/Kolkata from a fixed clock (`0 9 * * 1,4`, `*/2`, `@daily`, never-firing), firing/skip/removal with a real runs service; Slack payload golden file (`notify/testdata/slack_failed_run.golden.json`, refresh with `go test ./internal/notify -update`), httptest webhook (success, Slack error reason, no URL leak), email MIME structure (parts, order, encoding, escaping, line length), a fake SMTP server that checks STARTTLS before AUTH and refuses to send without it, NOTIFY_ON per run status, and handler tests for schedules and notify/test.
+- ADR-0007: schedule and notification semantics (skip instead of queue, one time zone, no catch-up after downtime, NOTIFY_ON).
 
 ### Changed
 - `api.New` takes the runs service (a `RunStarter`) in addition to config, store and logger.
+- `api.New` now takes an `api.Services` struct (runs, scheduler, notifier) instead of the runs service alone.
+- `config`: `SlackConfigured()` and `EmailConfigured()` are shared by the health endpoint and the notifier; NOTIFY_ON is validated at startup.
+- The runs service uses the real notifier instead of `NopNotifier` (still used in tests).
 - Node 22 is the baseline: `engines.node >=22` in agents/, demo-app/ and web/; `@types/node` bumped to 22 everywhere.
 - agents/: vitest 3.x → 5.x.
 - agents/ and demo-app/ tsconfig: `allowImportingTsExtensions`, so imports use `.ts` paths (tsx and Playwright run them directly). demo-app/ also typechecks `src/`.
@@ -55,7 +71,13 @@ All notable changes to this project are documented here. Format: Keep a Changelo
 - `demo-app/public/app.js` is plain JavaScript and isn't typechecked or linted.
 - Under `FLAKY=1` mainly the search test turns flaky, because actions wait up to 30 s for the product list while only `expect` uses the 5 s timeout.
 - No formatter or linter for agents/ and demo-app/ beyond `tsc` (no Prettier/ESLint there).
-- Runs only start manually via the API; schedules and the dashboard runs pages come in later steps. There is no endpoint to cancel a run yet.
+- Runs start manually via the API or from schedules; the dashboard runs and schedules pages come in later steps. There is no endpoint to cancel a run yet.
+- Not verified against real services yet (no Slack workspace or Gmail account set up): `/api/notify/test` posting to a real Slack webhook, a real Gmail delivery over STARTTLS with an app password, how the HTML email renders in Gmail and other clients, and Slack rendering the Block Kit message. Delivery was tested only against fakes: an httptest webhook, an in-process SMTP server, and a local listener during a live scheduled run.
+- Email supports STARTTLS only (port 587); implicit TLS on port 465 is not supported.
+- Notifications are sent one channel after the other inside the run goroutine; a slow SMTP server (up to the 30 s timeout) delays the run's completion log, not its stored status.
+- Schedules can only be enabled, disabled or deleted; changing a schedule's cron means deleting and recreating it.
+- Firings missed while the server is down are not caught up (ADR-0007), and skipped firings are only visible in the server log.
+- The "View run" link points to `DASHBOARD_URL/runs/<id>`, which the dashboard doesn't have yet.
 - Killing the Playwright process group uses Unix process groups (`Setpgid`), so the server doesn't build for Windows.
 - Run folders under `DATA_DIR/runs/` are never cleaned up (a trace is about 0.5 MB per failed attempt).
 - Only one Playwright project is assumed: with several, each project's result is stored under the same title and file.

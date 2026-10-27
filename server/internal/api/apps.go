@@ -215,6 +215,12 @@ func (s *Server) handleDeleteApp(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
+	// The database cascades to schedules; the scheduler's entries go by hand.
+	schedules, err := s.store.ListSchedules(r.Context(), id)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
 	err = s.store.DeleteApp(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "app not found")
@@ -223,6 +229,9 @@ func (s *Server) handleDeleteApp(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.internalError(w, r, err)
 		return
+	}
+	for _, sch := range schedules {
+		s.sched.Remove(sch.ID)
 	}
 	writeJSON(w, http.StatusOK, deleteAppResponse{
 		Deleted: true,

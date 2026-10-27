@@ -46,7 +46,14 @@ type Config struct {
 	SMTPPass        string
 	EmailFrom       string
 	EmailTo         string
+	NotifyOn        string // NotifyAll or NotifyFailures
 }
+
+// NOTIFY_ON values.
+const (
+	NotifyAll      = "all"      // every finished run
+	NotifyFailures = "failures" // only failed and error runs
+)
 
 // Load reads envFile (if it exists), then builds a Config from the process
 // environment. Variables already set in the environment win over the file.
@@ -98,12 +105,16 @@ func build(get func(string) string, baseDir string) (Config, error) {
 		SMTPPass:        p.str("SMTP_PASS", ""),
 		EmailFrom:       p.str("EMAIL_FROM", ""),
 		EmailTo:         p.str("EMAIL_TO", ""),
+		NotifyOn:        p.str("NOTIFY_ON", NotifyAll),
 	}
 	if len(p.errs) > 0 {
 		return Config{}, fmt.Errorf("config: %w", errors.Join(p.errs...))
 	}
 	if c.LLMProvider != "gemini" && c.LLMProvider != "anthropic" {
 		return Config{}, fmt.Errorf("config: LLM_PROVIDER must be gemini or anthropic, got %q", c.LLMProvider)
+	}
+	if c.NotifyOn != NotifyAll && c.NotifyOn != NotifyFailures {
+		return Config{}, fmt.Errorf("config: NOTIFY_ON must be all or failures, got %q", c.NotifyOn)
 	}
 	if _, err := time.LoadLocation(c.Timezone); err != nil {
 		return Config{}, fmt.Errorf("config: TIMEZONE: %w", err)
@@ -153,7 +164,20 @@ func (c Config) LogValue() slog.Value {
 		slog.String("smtp_pass", set(c.SMTPPass)),
 		slog.String("email_from", c.EmailFrom),
 		slog.String("email_to", c.EmailTo),
+		slog.String("notify_on", c.NotifyOn),
 	)
+}
+
+// SlackConfigured reports whether Slack notifications are enabled.
+func (c Config) SlackConfigured() bool {
+	return c.SlackWebhookURL != ""
+}
+
+// EmailConfigured reports whether email notifications are enabled: sending
+// needs a server, credentials and a recipient. EMAIL_FROM defaults to
+// SMTP_USER, so it is not required.
+func (c Config) EmailConfigured() bool {
+	return c.SMTPHost != "" && c.SMTPUser != "" && c.SMTPPass != "" && c.EmailTo != ""
 }
 
 func absFrom(baseDir, p string) (string, error) {

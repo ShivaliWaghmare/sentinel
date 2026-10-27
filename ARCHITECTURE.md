@@ -26,12 +26,12 @@ Notifications go to a Slack Incoming Webhook and SMTP email.
 - config: loads .env from the repo root, applies defaults, resolves relative paths to absolute ones and logs them at startup.
 - store: SQLite access and embedded migrations.
 - api: REST handlers, CORS, JSON helpers, read-only mode middleware.
-- scheduler: robfig/cron with the TIMEZONE location. Loads enabled schedules at boot; adds and removes entries when the API changes them.
+- scheduler: robfig/cron with the TIMEZONE location. Loads enabled schedules at boot; adds and removes entries when the API changes them. Rules in ADR-0007: a firing for an app with an active run is skipped (logged, never queued); firings missed while the server is down are not caught up; a firing re-reads its schedule and does nothing if it was deleted or disabled.
 - runner: spawns Playwright and parses its JSON report.
 - runs: orchestrates a test run end to end (lifecycle 1). At most one active run per app.
 - agents: supervisor that spawns the agent CLI, reads stdout JSONL, stores events, publishes them to SSE and applies results.
 - sse: in-memory pub/sub broker keyed by agent run ID.
-- notify: Slack and email formatting and sending.
+- notify: Slack (Incoming Webhook, Block Kit) and email (net/smtp with required STARTTLS, multipart/alternative HTML + plain text) formatting and sending. Implements the runs service's Notifier. A channel is enabled only when configured; NOTIFY_ON picks which runs are reported.
 
 ### Agents (agents/)
 - src/cli.ts: entry point. `tsx src/cli.ts <kind> --input <file.json>`. Reads and validates the input, writes events as JSONL to stdout, logs to stderr. Exit 0 when the run completes (even if it found nothing); non-zero only on crashes.
@@ -67,7 +67,11 @@ IDs are INTEGER PRIMARY KEY AUTOINCREMENT, so a deleted row's ID is never reused
    - Origin comes from the folder: `manual/` or `generated/` directly under `tests/<slug>/`. Results from other paths are stored with test_case_id null.
 4. If tests failed: triage. Rules first (passed on retry → flaky; connection refused, DNS or net::ERR_ errors → environment). Remaining failures go to one triage agent run; wait up to TRIAGE_TIMEOUT.
 5. Failures classified ui_change start a heal agent run in the background; its proposals wait for approval.
-6. Finish the run and send notifications: counts, each failure with its triage category and summary, and a dashboard link. The runs service calls a Notifier interface; notification errors are logged and never change the run.
+6. Finish the run and send notifications: counts, each failure with its triage category and summary, and a dashboard link. The runs service calls a Notifier interface; notification errors are logged and never change the run. With NOTIFY_ON=failures, passed runs are not reported.
+   - Both formats show: status emoji (✅ passed, ❌ failed, ⚠️ error), app name and passed/total (or "run error" plus the error's first line), a context line (run number, trigger, duration, flaky, skipped), up to 10 failures with title and first error line (200 characters max), "and N more failures", and a "View run" link to DASHBOARD_URL/runs/<id>.
+   - Slack: header, context, one section per failure, actions button; the message's `text` is the subject line as a fallback. Test titles and errors are escaped for mrkdwn.
+   - Email: subject like "❌ ShopLite: 6/8 passed (run #12)" (RFC 2047 encoded), multipart/alternative with text/plain then text/html (inline styles only), quoted-printable. EMAIL_TO is a comma-separated list; EMAIL_FROM defaults to SMTP_USER. The server must offer STARTTLS, otherwise nothing is sent.
+   - Triage category and summary per failure are added in roadmap step 9; both formats mark the spot with a `STEP 9 (triage)` comment.
 
 Run status rules:
 - running while Playwright runs (queued is reserved for later; it counts as active).
@@ -144,6 +148,11 @@ Every endpoint follows these rules:
   - GET /api/runs → {"runs": [...]} newest first, without results. app_id filters by app; limit defaults to 20, maximum 100; invalid values are a 400.
   - GET /api/runs/{id} → the run plus results: [{id, test_case_id, title, file_path, line, status, duration_ms, error, retries, artifacts: {screenshot?, trace?, url?, aria_snapshot?}}]. Triage is added with lifecycle step 4.
 - GET, POST /api/schedules?app_id · PATCH, DELETE /api/schedules/{id} · GET /api/schedules/preview?cron= (next 5 fire times)
+  - Schedule fields: id, app_id, cron, enabled, created_at, next_run (null while disabled). The human-readable description is made by the dashboard (cronstrue), not the server.
+  - GET → {"schedules": [...]} ordered by id; app_id filters (an unknown app gives []).
+  - POST {app_id, cron, enabled?} → 201. enabled defaults to true; cron is trimmed. Invalid cron → 400 "invalid cron: <parser message>"; unknown app → 404. Allowed: 5-field cron and descriptors (@daily, @weekly, @hourly, …); `@every` and `TZ=`/`CRON_TZ=` prefixes are rejected (ADR-0007).
+  - PATCH {enabled} → 200 with the schedule. DELETE → 204. Deleting an app deletes its schedules and their cron entries.
+  - preview → {valid, error, timezone, next_runs}. Times are UTC like every API timestamp; timezone (TIMEZONE) tells the dashboard where they fire. Invalid or missing cron → 400 with the same shape (valid false, error set, next_runs []).
 - POST /api/apps/{id}/probe · POST /api/apps/{id}/explore · POST /api/apps/{id}/heal {test_result_ids}
 - GET /api/agent-runs?app_id&kind · GET /api/agent-runs/{id} · GET /api/agent-runs/{id}/events (SSE) · POST /api/agent-runs/{id}/cancel
 - GET /api/heal-proposals?status · GET /api/heal-proposals/{id} · PATCH /api/heal-proposals/{id}
@@ -152,6 +161,7 @@ Every endpoint follows these rules:
   - The path must be clean and relative: "..", ".", empty segments, backslashes and absolute paths are a 400. Symlinks are resolved and the real file must stay inside the allowed folder; directories and missing files are a 404.
   - Content-Type by extension: png → image/png, zip → application/zip, txt/log/md → text/plain; charset=utf-8, json → application/json, anything else → application/octet-stream. Always sent with X-Content-Type-Options: nosniff.
 - GET /api/stats/overview · GET /api/evals/latest · POST /api/notify/test
+  - POST /api/notify/test sends a sample failing report (marked "[Test]") to every configured channel, whatever NOTIFY_ON says, and answers 200 with {"slack": {configured, ok, error}, "email": {...}}. A failing channel is reported in its error field, not as an HTTP error. Secrets (webhook URL, SMTP password) never appear in errors.
 
 ## Demo app (demo-app/)
 "ShopLite": an Express server with server-rendered pages: login, products (search, sort), product detail, cart, checkout form with validation, order confirmation.
@@ -186,7 +196,8 @@ Experiments: coverage and validity, bug detection (manual vs generated suites), 
 | AGENT_TIMEOUT | 20m | Wall-clock budget per agent run |
 | AGENT_CONCURRENCY | 1 | Agent runs at the same time (others queue) |
 | SLACK_WEBHOOK_URL | | Slack Incoming Webhook |
-| SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM, EMAIL_TO | smtp.gmail.com, 587 | Email reports |
+| SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM, EMAIL_TO | smtp.gmail.com, 587 | Email reports (STARTTLS required; EMAIL_TO comma-separated; EMAIL_FROM defaults to SMTP_USER) |
+| NOTIFY_ON | all | Which runs are reported: all, or failures (failed and error runs only) |
 web/.env.local: NEXT_PUBLIC_API_URL=http://localhost:8080
 
 ## Security notes

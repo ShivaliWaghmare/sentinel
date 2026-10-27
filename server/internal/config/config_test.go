@@ -18,7 +18,7 @@ func TestBuildDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	if c.Port != 8080 || c.Timezone != "Asia/Kolkata" || c.RunTimeout != 15*time.Minute ||
-		c.AgentMaxCostUSD != 1.0 || !c.LLMVision || c.SMTPPort != 587 {
+		c.AgentMaxCostUSD != 1.0 || !c.LLMVision || c.SMTPPort != 587 || c.NotifyOn != NotifyAll {
 		t.Errorf("unexpected defaults: %+v", c)
 	}
 	if c.DataDir != "/repo/data" {
@@ -43,6 +43,8 @@ func TestBuildValues(t *testing.T) {
 		{"bad int", map[string]string{"PORT": "abc"}, nil, "PORT"},
 		{"bad duration", map[string]string{"RUN_TIMEOUT": "15"}, nil, "RUN_TIMEOUT"},
 		{"bad provider", map[string]string{"LLM_PROVIDER": "openai"}, nil, "LLM_PROVIDER"},
+		{"notify on failures", map[string]string{"NOTIFY_ON": "failures"}, func(c Config) bool { return c.NotifyOn == NotifyFailures }, ""},
+		{"bad notify on", map[string]string{"NOTIFY_ON": "never"}, nil, "NOTIFY_ON"},
 		{"bad timezone", map[string]string{"TIMEZONE": "Mars/Base"}, nil, "TIMEZONE"},
 		{"all errors reported", map[string]string{"PORT": "x", "SMTP_PORT": "y"}, nil, "SMTP_PORT"},
 	}
@@ -109,5 +111,30 @@ func TestLogValueHidesSecrets(t *testing.T) {
 		if strings.Contains(out, secret) {
 			t.Errorf("log output leaks %q: %s", secret, out)
 		}
+	}
+}
+
+func TestNotificationChannelsConfigured(t *testing.T) {
+	full := Config{SlackWebhookURL: "https://hooks.example/x", SMTPHost: "smtp.gmail.com", SMTPUser: "u", SMTPPass: "p", EmailTo: "a@b.c"}
+	tests := []struct {
+		name         string
+		mutate       func(*Config)
+		slack, email bool
+	}{
+		{"everything set", func(*Config) {}, true, true},
+		{"nothing set", func(c *Config) { *c = Config{} }, false, false},
+		{"no webhook", func(c *Config) { c.SlackWebhookURL = "" }, false, true},
+		{"no password", func(c *Config) { c.SMTPPass = "" }, true, false},
+		{"no recipient", func(c *Config) { c.EmailTo = "" }, true, false},
+		{"no from is fine", func(c *Config) { c.EmailFrom = "" }, true, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := full
+			tt.mutate(&c)
+			if c.SlackConfigured() != tt.slack || c.EmailConfigured() != tt.email {
+				t.Errorf("slack, email = %v, %v; want %v, %v", c.SlackConfigured(), c.EmailConfigured(), tt.slack, tt.email)
+			}
+		})
 	}
 }
